@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "diskrag"
+version = "0.1.0"
+description = "DiskRAG 是一個基於 DiskANN 的向量檢索系統，用於處理和搜尋文件。"
+authors = ["Haruki <haruki.huang@johoexcel.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.12"
+scikit-learn = "^1.6.1"
+psutil = "^7.0.0"
+tqdm = "^4.67.1"
+python-docx = "^1.1.2"
+polars = "^1.30.0"
+numpy = "^2.2.6"
+openai = "^1.82.0"
+pydantic = "^2.11.5"
+uvicorn = "^0.34.2"
+pyyaml = "^6.0.2"
+google-cloud-aiplatform = "^1.94.0"
+jinja2 = "^3.1.6"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+black = "^24.1.0"
+isort = "^5.13.0"
+mypy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

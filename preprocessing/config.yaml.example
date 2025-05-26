@@ -1,0 +1,92 @@
+# 預處理工具配置文件示例
+# 複製此文件並重命名為 config.yaml，然後根據需要修改配置
+
+# 基本配置
+collection: "my_collection"  # collection 名稱，用於識別和管理數據集
+
+# Embedding 配置
+embedding:
+  # 選擇 embedding 提供商
+  # - openai: 使用 OpenAI 的 API
+  # - vertex: 使用 Google Vertex AI
+  provider: "openai"
+
+  # 選擇 embedding 模型
+  # OpenAI 模型:
+  # - text-embedding-3-small: 較小但快速的模型，適合一般用途
+  # - text-embedding-3-large: 較大但更準確的模型，適合需要高精度的場景
+  # Vertex AI 模型:
+  # - textembedding-gecko@latest: Google 的通用 embedding 模型
+  model: "text-embedding-3-small"
+
+  # API 相關配置
+  project_id: null  # Vertex AI 專案 ID，使用 Vertex AI 時必須設置
+  api_key: null     # OpenAI API 金鑰，使用 OpenAI 時必須設置
+                   # 建議通過環境變數 OPENAI_API_KEY 設置
+
+  # 重試配置
+  max_retries: 3    # API 調用失敗時的最大重試次數
+  retry_delay: 2    # 重試之間的等待時間（秒）
+
+# 問題生成配置
+question_generation:
+  # 是否啟用問題生成
+  # - true: 為每個問答對生成相似問題
+  # - false: 只使用原始問題
+  enabled: true
+
+  # 選擇 LLM 提供商
+  # - openai: 使用 OpenAI 的 API
+  # - vertex: 使用 Google Vertex AI
+  provider: "openai"
+
+  # 選擇 LLM 模型
+  # OpenAI 模型:
+  # - gpt-3.5-turbo: 較快且經濟的選擇
+  # - gpt-4: 更準確但成本較高
+  # Vertex AI 模型:
+  # - text-bison@latest: Google 的通用語言模型
+  model: "gpt-3.5-turbo"
+
+  # 問題生成參數
+  max_questions: 5     # 每個問答對生成的最大問題數
+  temperature: 0.7     # 生成溫度，控制創造性（0.0-1.0）
+                      # 較低的值（如 0.3）會產生更保守的問題
+                      # 較高的值（如 0.8）會產生更多樣化的問題
+
+  # 重試配置
+  max_retries: 3       # API 調用失敗時的最大重試次數
+  retry_delay: 2       # 重試之間的等待時間（秒）
+
+  # API 相關配置
+  project_id: null     # Vertex AI 專案 ID，使用 Vertex AI 時必須設置
+                      # 如果 embedding 和問題生成都使用 Vertex AI，
+                      # 這裡可以省略，會使用 embedding 的 project_id
+
+# 分塊配置（用於文章模式）
+chunk:
+  size: 300           # 每個文本塊的最大字符數
+  overlap: 50         # 相鄰文本塊之間的重疊字符數
+  min_size: 50        # 文本塊的最小字符數
+                     # 如果剩餘文本少於此值，會與前一個塊合併
+
+# 輸出配置
+output:
+  format: "parquet"   # 輸出文件格式，目前只支持 parquet
+  compression: "snappy"  # 壓縮方式
+                       # - snappy: 較快的壓縮/解壓縮速度
+                       # - gzip: 較高的壓縮率
+                       # - none: 不壓縮
+
+# 環境變數支持
+# 以下配置可以通過環境變數設置：
+# - OPENAI_API_KEY: OpenAI API 金鑰
+# - VERTEX_PROJECT_ID: Vertex AI 專案 ID
+# - COLLECTION_NAME: collection 名稱
+# 環境變數會覆蓋配置文件中的相應設置
+
+# 示例：使用環境變數的配置
+# collection: ${COLLECTION_NAME:-default_collection}  # 如果未設置環境變數，使用默認值
+# embedding:
+#   api_key: ${OPENAI_API_KEY}  # 從環境變數讀取 API 金鑰
+#   project_id: ${VERTEX_PROJECT_ID}  # 從環境變數讀取專案 ID 

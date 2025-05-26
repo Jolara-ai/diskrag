@@ -1,0 +1,41 @@
+pydiskann/pq/__pycache__/pq_model.cpython-312.pyc
+pydiskann/pq/__pycache__/__init__.cpython-312.pyc
+pydiskann/io/__pycache__/diskann_persist.cpython-312.pyc
+pydiskann/io/__pycache__/__init__.cpython-312.pyc
+pydiskann/__pycache__/vamana_graph.cpython-312.pyc
+pydiskann/__pycache__/__init__.cpython-312.pyc
+data/pq_model.pkl
+data/pq_codes.bin
+data/meta.json
+data/index.dat
+repomix-output.txt.md
+poetry.lock
+
+# 資料與暫存檔
+data/
+__pycache__/
+*.pyc
+*.pkl
+*.bin
+*.dat
+*.gif
+*.json
+poetry.lock
+
+# Data files
+data/*
+!data/.gitkeep
+
+# Log files
+logs/*
+!logs/.gitkeep
+
+# Documentation build files
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/

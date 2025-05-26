@@ -1,0 +1,39 @@
+# 基本配置
+collection: "faq_20250525"  # collection 名稱
+
+# Embedding 配置
+embedding:
+  provider: "openai"  # 使用 OpenAI
+  model: "text-embedding-3-small"  # OpenAI 的 embedding 模型
+  api_key: null  # 將從環境變數讀取
+  max_retries: 3
+  retry_delay: 2
+
+# 問題生成配置
+question_generation:
+  enabled: true
+  provider: "openai"  # 使用 OpenAI
+  model: "gpt-4o-mini"  # 使用標準的gpt-4o-mini 模型
+  max_questions: 5
+  temperature: 0.7
+  max_retries: 3
+  retry_delay: 2
+
+# 分塊配置
+chunk:
+  size: 300
+  overlap: 50
+  min_size: 50
+
+# 輸出配置
+output:
+  format: "parquet"
+  compression: "snappy"
+
+# 索引配置
+index:
+  R: 32  # 圖的度數
+  threads: 1  # 線程數
+  # 其他索引參數（如果需要）
+  # L: 64  # 搜索列表大小
+  # alpha: 1.2  # 剪枝參數 
