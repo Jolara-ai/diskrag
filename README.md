@@ -470,6 +470,15 @@ diskrag/
 - 可以同時維護多個 collection 用於不同的用途
 - 優先使用 `config.yaml` 中的設定，命令列參數可以覆蓋設定檔中的設定
 
+## References
+
+This project is inspired by the design and algorithm presented in the following research paper:
+
+**DiskANN: Fast Accurate Billion-Point Nearest Neighbor Search on a Single Node**  
+Microsoft Research  
+🔗 https://www.microsoft.com/en-us/research/publication/diskann-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node/
+
+
 ## 授權條款
 
 MIT
