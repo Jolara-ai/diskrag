@@ -155,7 +155,7 @@ poetry run python -m preprocessing.cli process --type csv --input ./docs/faq.csv
 poetry run python -m preprocessing.cli process --type csv --input ./docs/faq_post.csv --config ./faq_config.yaml
 ```
 
-> **注意**：FAQ 處理必須先使用 `--dry-run` 模式產生問題，然後使用產生的 `*_post.csv` 檔案進行正式處理。
+> **注意**：FAQ 處理必須先使用 `--dry-run` 模式產生問題，然後使用產生的 `*_post.csv` 檔案進行正式處理。FAQ 的筆數建議至少要有50筆資料。
 
 #### 手冊檔案處理
 
