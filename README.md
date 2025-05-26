@@ -19,7 +19,7 @@ DiskRAG 是一個基於 DiskANN 的向量檢索系統，用於處理和搜尋文
 
 ```bash
 # 複製儲存庫
-git clone https://github.com/yourusername/diskrag.git
+git clone https://github.com/joho-ai/diskrag.git
 cd diskrag
 
 # 安裝相依套件
