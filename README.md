@@ -383,6 +383,7 @@ curl -X POST "http://localhost:8000/ask" \
 docker-compose down
 ```
 
+
 ## TODO
 
 ### 功能增強
@@ -407,9 +408,9 @@ docker-compose down
 - [ ] 檔案格式驗證工具
 - [ ] 批次處理工具
 
-### Collection 管理
-- [ ] Collection 建立流程說明
-- [ ] Collection 更新流程說明
+### 以Docker 管理 Collection 
+- [ ] Collection 建立、刪除、列表 (測試中)
+- [ ] Collection 管理流程說明
 - [ ] Collection 備份和還原說明
 - [ ] Collection 狀態檢查工具
 
