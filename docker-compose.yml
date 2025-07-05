@@ -1,95 +1,34 @@
 version: '3.8'
 
 services:
+  # 主要服務 - 用於處理和搜尋
+  diskrag:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./collections:/app/collections
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: ["--help"]  # 預設顯示幫助
+
+  # API 服務（可選）
   api:
     build: .
     ports:
-      - "${PORT:-8000}:8000"
+      - "8000:8000"
     env_file:
       - .env
     volumes:
-      # 可寫入掛載 collections 目錄（API 需要寫入日誌和暫存檔案）
-      - ./collections:/app/collections
-      # 唯讀掛載 configs 目錄
-      - ./configs:/app/configs:ro
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-    # 新增使用者對應，確保檔案權限正確
-    user: "${UID:-1000}:${GID:-1000}"
-
-  # 索引建立服務
-  build-index:
-    build: .
-    command: ["poetry", "run", "python", "-m", "preprocessing.cli", "build-index"]
-    env_file:
-      - .env
-    volumes:
-      # 可寫入掛載 collections 目錄
-      - ./collections:/app/collections
-      # 唯讀掛載 configs 目錄
-      - ./configs:/app/configs:ro
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 2G
+      - ./collections:/app/collections:ro
+    command: ["python", "app.py"]
     profiles:
-      - build-index
+      - api
 
-  # 預處理服務
-  preprocess:
-    build: .
-    command: ["poetry", "run", "python", "-m", "preprocessing.cli", "process"]
-    env_file:
-      - .env
-    volumes:
-      # 可寫入掛載所有必要目錄
-      - ./collections:/app/collections
-      - ./data:/app/data
-      - ./configs:/app/configs:ro
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    profiles:
-      - preprocess
-
-  # 管理服務
-  manage:
-    build: .
-    command: ["poetry", "run", "python", "-m", "preprocessing.cli", "list"]
-    env_file:
-      - .env
-    volumes:
-      # 可寫入掛載 collections 目錄
-      - ./collections:/app/collections
-      # 唯讀掛載 configs 目錄
-      - ./configs:/app/configs:ro
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-    profiles:
-      - manage
-
-volumes:
-  collections:
-    driver: local
-  data:
-    driver: local 
+# 使用範例：
+# docker-compose run --rm diskrag process data/faq.csv --collection faq
+# docker-compose run --rm diskrag index faq
+# docker-compose run --rm diskrag search faq "如何使用"
+# docker-compose run --rm diskrag list
