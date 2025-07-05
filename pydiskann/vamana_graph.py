@@ -1,6 +1,7 @@
 import numpy as np
 import heapq
 import random
+from tqdm import tqdm
 
 # --- 基礎資料結構 ---
 
@@ -23,15 +24,23 @@ class VamanaGraph:
 
 # --- 距離計算 ---
 
+# 優化但等價的距離計算
+def l2_distance_fast(x, y):
+    diff = x - y
+    return np.sqrt(np.dot(diff, diff))
+
 def l2_distance(x, y):
     return np.linalg.norm(x - y)
+
+
+
 
 # --- 建圖用 Greedy Search ---
 
 def greedy_search(graph, start_idx, query_vector, L):
     visited = set()
     candidates = []
-    heapq.heappush(candidates, (l2_distance(graph.nodes[start_idx].vector, query_vector), start_idx))
+    heapq.heappush(candidates, (l2_distance_fast(graph.nodes[start_idx].vector, query_vector), start_idx))
     result = []
 
     while candidates and len(result) < L:
@@ -43,7 +52,7 @@ def greedy_search(graph, start_idx, query_vector, L):
 
         for neighbor_idx in graph.nodes[current_idx].neighbors:
             if neighbor_idx not in visited:
-                neighbor_dist = l2_distance(graph.nodes[neighbor_idx].vector, query_vector)
+                neighbor_dist = l2_distance_fast(graph.nodes[neighbor_idx].vector, query_vector)
                 heapq.heappush(candidates, (neighbor_dist, neighbor_idx))
 
     return result, visited
@@ -56,13 +65,13 @@ def robust_prune(graph, point_idx, candidate_set, alpha, R):
     point_vector = graph.nodes[point_idx].vector
 
     while candidate_set and len(new_neighbors) < R:
-        closest = min(candidate_set, key=lambda idx: l2_distance(point_vector, vectors[idx]))
+        closest = min(candidate_set, key=lambda idx: l2_distance_fast(point_vector, vectors[idx]))
         new_neighbors.append(closest)
         candidate_set.remove(closest)
 
         to_remove = set()
         for idx in candidate_set:
-            if alpha * l2_distance(vectors[closest], vectors[idx]) <= l2_distance(point_vector, vectors[idx]):
+            if alpha * l2_distance_fast(vectors[closest], vectors[idx]) <= l2_distance_fast(point_vector, vectors[idx]):
                 to_remove.add(idx)
         candidate_set -= to_remove
 
@@ -70,24 +79,46 @@ def robust_prune(graph, point_idx, candidate_set, alpha, R):
 
 # --- 建圖主程式 ---
 
-def build_vamana(points, R=16, L=32, alpha=1.2):
+def build_vamana(points, R=16, L=32, alpha=1.2, show_progress=False):
     n_points = len(points)
     graph = VamanaGraph(R)
+    
+    # 轉換為 numpy array 以加速計算
+    points_array = np.array(points) if not isinstance(points, np.ndarray) else points
 
+    # 添加所有節點
     for idx, vec in enumerate(points):
         graph.add_node(idx, vec)
 
+    # 初始化隨機連接
+    if show_progress:
+        print("初始化隨機連接...")
     for idx in range(n_points):
         while len(graph.nodes[idx].neighbors) < R:
             neighbor = random.randint(0, n_points - 1)
             if neighbor != idx:
                 graph.add_edge(idx, neighbor)
 
-    medoid_idx = np.argmin(np.sum([[l2_distance(p1, p2) for p2 in points] for p1 in points], axis=1))
+    if show_progress:
+        print("計算 medoid（這可能需要一些時間）...")
+    
+
+    diff = points_array[:, np.newaxis, :] - points_array[np.newaxis, :, :]
+    distances_matrix = np.linalg.norm(diff, axis=2)
+    total_distances = np.sum(distances_matrix, axis=1)
+    medoid_idx = np.argmin(total_distances)
+    
+    if show_progress:
+        print(f"選擇的 medoid: {medoid_idx}")
+
     sigma = list(range(n_points))
     random.shuffle(sigma)
 
-    for idx in sigma:
+    # 第一階段
+    iterator1 = sigma
+    if show_progress:
+        iterator1 = tqdm(sigma, desc='Vamana 第一階段')
+    for idx in iterator1:
         candidates, _ = greedy_search(graph, medoid_idx, graph.nodes[idx].vector, L)
         robust_prune(graph, idx, set(candidates), alpha=1.0, R=R)
         for neighbor in graph.nodes[idx].neighbors.copy():
@@ -95,7 +126,11 @@ def build_vamana(points, R=16, L=32, alpha=1.2):
             if len(graph.nodes[neighbor].neighbors) > R:
                 robust_prune(graph, neighbor, graph.nodes[neighbor].neighbors.copy(), alpha=1.0, R=R)
 
-    for idx in sigma:
+    # 第二階段
+    iterator2 = sigma
+    if show_progress:
+        iterator2 = tqdm(sigma, desc='Vamana 第二階段')
+    for idx in iterator2:
         candidates, _ = greedy_search(graph, medoid_idx, graph.nodes[idx].vector, L)
         robust_prune(graph, idx, set(candidates), alpha=alpha, R=R)
         for neighbor in graph.nodes[idx].neighbors.copy():
@@ -112,7 +147,7 @@ def beam_search_from_disk(reader,query_vector, start_id, beam_width=8, k=5):
     beam = []
     top_k = []
 
-    # 初始距離直接用真實 L2（讀一次向量）
+
     vec, _ = reader.get_node(start_id)
     init_dist = np.linalg.norm(vec - query_vector)
     heapq.heappush(beam, (init_dist, start_id))
@@ -154,7 +189,7 @@ def beam_search(graph, query_vector, start_idx, beam_width=5, k=3):
     beam = []
     top_k = []
 
-    heapq.heappush(beam, (l2_distance(graph.nodes[start_idx].vector, query_vector), start_idx))
+    heapq.heappush(beam, (l2_distance_fast(graph.nodes[start_idx].vector, query_vector), start_idx))
     heapq.heappush(top_k, (float('-inf'), -1))  # 初始化 top_k
 
     while beam:
@@ -166,7 +201,7 @@ def beam_search(graph, query_vector, start_idx, beam_width=5, k=3):
         for neighbor_idx in graph.nodes[current_idx].neighbors:
             if neighbor_idx in visited:
                 continue
-            neighbor_dist = l2_distance(graph.nodes[neighbor_idx].vector, query_vector)
+            neighbor_dist = l2_distance_fast(graph.nodes[neighbor_idx].vector, query_vector)
             heapq.heappush(beam, (neighbor_dist, neighbor_idx))
             heapq.heappush(top_k, (-neighbor_dist, neighbor_idx))
             if len(top_k) > k:

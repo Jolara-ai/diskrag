@@ -7,10 +7,14 @@ class SimplePQ:
         self.n_subvectors = n_subvectors
         self.kmeans_list = []
 
-    def fit(self, vectors):
+    def fit(self, vectors, show_progress=False):
         d = vectors.shape[1]
         sub_dim = d // self.n_subvectors
-        for i in range(self.n_subvectors):
+        iterator = range(self.n_subvectors)
+        if show_progress:
+            from tqdm import tqdm
+            iterator = tqdm(iterator, desc='PQ 子量化器訓練')
+        for i in iterator:
             subvectors = vectors[:, i*sub_dim:(i+1)*sub_dim]
             kmeans = KMeans(n_clusters=16, n_init=1, max_iter=50, random_state=42).fit(subvectors)
             self.kmeans_list.append(kmeans)
