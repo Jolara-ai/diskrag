@@ -12,7 +12,7 @@ services:
       - ./config.yaml:/app/config.yaml:ro
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-    command: ["--help"]  # 預設顯示幫助
+    command: ["python", "diskrag.py", "--help"]  # 預設顯示幫助
 
   # API 服務（可選）
   api:
@@ -23,7 +23,6 @@ services:
       - .env
     volumes:
       - ./collections:/app/collections:ro
-    command: ["python", "app.py"]
     profiles:
       - api
 

@@ -10,6 +10,7 @@ from pydiskann.io.diskann_persist import DiskANNPersist
 from preprocessing.collection import CollectionManager
 from preprocessing.config import CollectionInfo
 from datetime import datetime
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,9 @@ def build_index(
         
         # 建立 PQ 模型
         logger.info("訓練 PQ 模型...")
-        pq_model = SimplePQ(n_subvectors=8)  # 使用 8 個子量化器，每個使用 16 個中心點
-        pq_model.fit(vectors)
+        pq_model = SimplePQ(n_subvectors=8)
+        # 包裝 PQ 訓練主迴圈
+        pq_model.fit(vectors, show_progress=True)
         
         # 對向量進行 PQ 編碼
         logger.info("對向量進行 PQ 編碼...")
@@ -85,7 +87,7 @@ def build_index(
         
         # 建立 Vamana 圖
         logger.info("建立 Vamana 圖...")
-        graph = build_vamana(vectors, R=R)
+        graph = build_vamana(vectors, R=R, show_progress=True)
         persist.save_index(str(index_dir / "index.dat"), graph)
         logger.info("Vamana 圖建立完成")
         

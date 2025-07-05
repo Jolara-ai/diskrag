@@ -22,4 +22,4 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD python -c "import sys; sys.exit(0)"
 
 # 預設命令
-ENTRYPOINT ["python", "diskrag.py"]
+ENTRYPOINT ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
