@@ -8,10 +8,7 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     POETRY_VERSION=1.7.1 \
     POETRY_HOME=/opt/poetry \
-    POETRY_VIRTUALENVS_CREATE=false \
-    OPENAI_API_KEY="" \
-    GOOGLE_CLOUD_PROJECT="" \
-    GOOGLE_APPLICATION_CREDENTIALS=""
+    POETRY_VIRTUALENVS_CREATE=false 
 
 # 安裝系統依賴 - 分層安裝以利用緩存
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,7 +22,6 @@ RUN curl -sSL https://install.python-poetry.org | python3 - \
 # 安裝編譯依賴 - 單獨一層
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    git \
     libpq-dev \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -50,10 +46,6 @@ USER appuser
 
 # 暴露端口
 EXPOSE 8000
-
-# 健康檢查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
 
 # 啟動命令
 CMD ["poetry", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"] 
