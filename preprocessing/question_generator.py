@@ -2,14 +2,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import json
 import logging
-from pathlib import Path
 import time
 from openai import OpenAI
-from vertexai.preview.language_models import TextGenerationModel
-from jinja2 import Template
-from .config import QuestionGenerationConfig
-from google.cloud import aiplatform
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +31,6 @@ class QuestionGenerator:
         # 初始化客戶端
         if self.provider == "openai":
             self.client = OpenAI()
-        elif self.provider == "vertex":
-            self.project_id = config.get("project_id")
-            if not self.project_id:
-                raise ValueError("project_id is required for Vertex AI")
-            aiplatform.init(project=self.project_id)
-            self.client = aiplatform.TextGenerationModel.from_pretrained(self.model)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -58,13 +46,6 @@ class QuestionGenerator:
                         max_tokens=1000
                     )
                     return response.choices[0].message.content.strip()
-                else:  # vertex
-                    response = self.client.predict(
-                        prompt,
-                        temperature=self.temperature,
-                        max_output_tokens=1000
-                    )
-                    return response.text.strip()
             except Exception as e:
                 if attempt == self.max_retries - 1:
                     logger.error(f"獲取 LLM 回應失敗 (重試{attempt + 1}/{self.max_retries}): {str(e)}")

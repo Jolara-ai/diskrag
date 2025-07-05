@@ -3,13 +3,11 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 import polars as pl
 import numpy as np
-from tqdm import tqdm
 import json
-import shutil
 
 from .config import PreprocessingConfig, get_text_hash
-from .question_generator import QuestionGenerator, GeneratedQuestion
-from .embedding import EmbeddingGenerator, EmbeddingResult
+from .question_generator import QuestionGenerator
+from .embedding import EmbeddingGenerator
 from .collection import CollectionManager
 
 logger = logging.getLogger(__name__)
@@ -336,16 +334,8 @@ class Preprocessor:
                     logger.info(f"\n檢查第 {i+1} 行:")
                     for col in df.columns:
                         value = row.get(col, "")
-                        # 檢查是否包含特殊字符
-                        if isinstance(value, str):
-                            # 打印完整的原始文本
-                            logger.info(f"  {col}: {value}")
-                            # 如果包含特殊字符，只標記位置
-                            special_positions = [(i, c) for i, c in enumerate(value) if ord(c) > 127 or c in '\n\r\t']
-                            if special_positions:
-                                logger.warning(f"  列 '{col}' 在以下位置包含特殊字符:")
-                                for pos, char in special_positions:
-                                    logger.warning(f"    位置 {pos}: '{char}' (Unicode: {ord(char)})")
+                        # 打印完整的原始文本
+                        logger.info(f"  {col}: {value}")
             
             except Exception as e:
                 logger.error(f"讀取 CSV 文件時出錯: {str(e)}")
@@ -402,17 +392,6 @@ class Preprocessor:
                     
                     # 組合問題和答案
                     text = f"問題:{normalized_question}\n答案:{normalized_answer}"
-                    
-                    # 檢查文本是否包含其他特殊字符
-                    special_positions = [(i, c) for i, c in enumerate(text) if ord(c) > 127 or c in '\n\r\t']
-                    if special_positions:
-                        logger.warning(f"第 {i+1} 行包含其他特殊字符:")
-                        logger.warning(f"完整文本:")
-                        logger.warning(f"問題: {normalized_question}")
-                        logger.warning(f"答案: {normalized_answer}")
-                        logger.warning("特殊字符位置:")
-                        for pos, char in special_positions:
-                            logger.warning(f"  位置 {pos}: '{char}' (Unicode: {ord(char)})")
                     
                     all_texts.append(text)
                     
@@ -477,8 +456,11 @@ class Preprocessor:
             # 只保留有效的文本和元數據
             try:
                 vectors = np.array([r.vector for r in embedding_results])
-                texts_to_store = [r.text for r in embedding_results]
+                texts_to_store = [all_texts[i] for i in valid_indices]
                 metadata_to_store = [all_metadata[i] for i in valid_indices]
+                assert len(vectors) == len(texts_to_store) == len(metadata_to_store), (
+                    f"資料長度不一致: vectors={len(vectors)}, texts={len(texts_to_store)}, metadata={len(metadata_to_store)}"
+                )
             except Exception as e:
                 logger.error(f"處理向量結果時出錯: {str(e)}")
                 raise ValueError(f"處理向量數據時出錯: {str(e)}")

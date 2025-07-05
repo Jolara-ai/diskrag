@@ -4,7 +4,6 @@ import numpy as np
 import logging
 import time
 from openai import OpenAI
-from vertexai.preview.language_models import TextEmbeddingModel
 from .config import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
@@ -25,9 +24,6 @@ class EmbeddingGenerator:
         """Setup embedding clients based on configuration"""
         if self.config.provider == "openai":
             self.openai_client = OpenAI()
-        elif self.config.provider == "vertexai":
-            # Vertex AI client will be initialized when needed
-            pass
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -45,8 +41,6 @@ class EmbeddingGenerator:
         """
         if self.config.provider == "openai":
             vector = self._get_openai_embedding(text, self.config.max_retries)
-        elif self.config.provider == "vertexai":
-            vector = self._get_vertexai_embedding(text, self.config.max_retries)
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
             
@@ -64,26 +58,6 @@ class EmbeddingGenerator:
                     input=text
                 )
                 return np.array(response.data[0].embedding)
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Failed to get embedding after {max_retries} attempts: {str(e)}")
-                    return None
-                logger.warning(f"Retrying embedding generation (attempt {attempt + 1}/{max_retries})")
-                time.sleep(self.config.retry_delay * (2 ** attempt))  # Exponential backoff
-
-    def _get_vertexai_embedding(self, text: str, max_retries: int = 3) -> Optional[np.ndarray]:
-        """Get embedding using Vertex AI API"""
-        if not self.config.project_id:
-            raise ValueError("project_id is required for Vertex AI")
-
-        for attempt in range(max_retries):
-            try:
-                model = TextEmbeddingModel.from_pretrained(self.config.model)
-                response = model.get_embeddings(
-                    [text],
-                    project=self.config.project_id
-                )
-                return np.array(response[0].values)
             except Exception as e:
                 if attempt == max_retries - 1:
                     logger.error(f"Failed to get embedding after {max_retries} attempts: {str(e)}")
