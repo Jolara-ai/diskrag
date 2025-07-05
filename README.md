@@ -3,6 +3,13 @@
 DiskRAG 是一套基於 DiskANN 的高效向量搜尋系統，讓你能輕鬆處理、索引與搜尋各類文件。
 
 ---
+## 快速開始
+
+```bash
+chmod +x scripts/quickstart.sh
+bash scripts/quickstart.sh
+```
+
 
 ## 一鍵安裝
 
