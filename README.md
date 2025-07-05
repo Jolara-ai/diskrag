@@ -3,12 +3,6 @@
 DiskRAG 是一套基於 DiskANN 的高效向量搜尋系統，讓你能輕鬆處理、索引與搜尋各類文件。
 
 ---
-## 快速開始
-
-```bash
-chmod +x scripts/quickstart.sh
-bash scripts/quickstart.sh
-```
 
 
 ## 一鍵安裝
@@ -39,8 +33,13 @@ export OPENAI_API_KEY='your-api-key'
 ```
 
 ---
-
 ## 快速開始
+
+```bash
+chmod +x scripts/quickstart.sh
+bash scripts/quickstart.sh
+```
+
 
 ### 1. 處理檔案
 
@@ -53,9 +52,6 @@ python diskrag.py process data/faq.csv --collection faq --questions
 
 # 處理 Markdown 檔案
 python diskrag.py process data/manual.md --collection manual
-
-# 處理 Word 檔案
-python diskrag.py process data/guide.docx --collection guide
 ```
 
 ### 2. 建立索引
