@@ -164,6 +164,15 @@ rmdir /s /q venv
 - 刪除前不需「停用」虛擬環境，它只是個資料夾。
 - 如果你改用 `.venv` 或其他資料夾名稱，也只要改對刪除的資料夾名稱即可。
 
+## References
+
+This project is inspired by the design and algorithm presented in the following research paper:
+
+**DiskANN: Fast Accurate Billion-Point Nearest Neighbor Search on a Single Node**  
+Microsoft Research  
+🔗 https://www.microsoft.com/en-us/research/publication/diskann-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node/
+
+
 ## 授權
 
 MIT
