@@ -1,11 +1,12 @@
-# DiskRAG - 快速入門指南
+# DiskRAG
 
-DiskRAG 是一套基於 DiskANN 的高效向量搜尋系統，讓你能輕鬆處理、索引與搜尋各類文件。
-
+DiskRAG by [Jolara.ai](https://github.com/Jolara-ai) — 基於 DiskANN 的高效向量搜尋系統、索引與搜尋各類文件。
 ---
 
 
-## 一鍵安裝
+## DiskRAG - 快速入門指南
+
+### 一鍵安裝
 
 你可以直接執行安裝腳本，或手動安裝：
 
