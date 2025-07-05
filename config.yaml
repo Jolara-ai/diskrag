@@ -1,0 +1,24 @@
+# DiskRAG 設定檔
+collection: "default"
+
+embedding:
+  provider: "openai"
+  model: "text-embedding-3-small"
+  max_retries: 3
+  retry_delay: 2
+
+question_generation:
+  enabled: false
+  provider: "openai"
+  model: "gpt-4o-mini"
+  max_questions: 5
+  temperature: 0.7
+
+chunk:
+  size: 300
+  overlap: 50
+  min_size: 50
+
+output:
+  format: "parquet"
+  compression: "snappy"
