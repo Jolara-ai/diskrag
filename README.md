@@ -96,20 +96,8 @@ title,paragraph_text,section
 ## Docker 用法
 
 ```bash
-# 建構映像
-docker-compose build
-
-# 處理檔案
-docker-compose run --rm diskrag process data/faq.csv --collection faq
-
-# 建立索引
-docker-compose run --rm diskrag index faq
-
-# 搜尋
-docker-compose run --rm diskrag search faq "如何使用"
-
-# 啟動 API 服務（選用）
-docker-compose --profile api up
+chmod +x scripts/run_api_with_check.sh
+bash scripts/run_api_with_check.sh
 ```
 
 ---
@@ -153,10 +141,6 @@ echo "OPENAI_API_KEY=your-api-key" > .env
 
 ---
 
-## 授權
-
-MIT
-
 ## 🧹 刪除虛擬環境的方法
 
 請根據你的作業系統執行：
@@ -179,3 +163,7 @@ rmdir /s /q venv
 🔐 **小提醒：**
 - 刪除前不需「停用」虛擬環境，它只是個資料夾。
 - 如果你改用 `.venv` 或其他資料夾名稱，也只要改對刪除的資料夾名稱即可。
+
+## 授權
+
+MIT
