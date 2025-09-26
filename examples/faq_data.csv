@@ -1,0 +1,6 @@
+id,question,answer,source_file,source_page,source_section,source_image
+faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
+faq_002,如何購買原裝配件？,應訪問 https://www.bosch-home.com/accessories/ 或聯繫當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
+faq_003,8歲以下的青少年可以使用嗎？,不可以，未滿 8 歲的青少年不得使用本機。,EBF7531SBA_ZH_Manual.pdf,3,安全資訊,images/safety.png
+faq_004,如何設定水質硬度？,在基本設定中，選擇「水質硬度」選項，並從等級 1 到 10 中選擇對應您所在地區的水質硬度。,EBF7531SBA_ZH_Manual.pdf,15,基本設定,images/water_hardness.png
+faq_005,洗碗機可以洗滌哪些物品？,可以洗滌：餐具、玻璃杯、碗盤、鍋具等。不可洗滌：木製餐具、鋁製鍋具、塑膠容器等。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/items.png 
