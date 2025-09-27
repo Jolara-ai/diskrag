@@ -69,6 +69,7 @@ class SearchRequest(BaseModel):
     collection: str = Field(..., description="要搜尋的 collection 名稱")
     query: str = Field(..., min_length=1, max_length=500, description="搜尋查詢文字")
     top_k: int = Field(5, ge=1, le=20, description="回傳結果數量")
+    use_faq_search: bool = Field(False, description="是否使用FAQ搜索模式（自動去重和格式化）")
 
 class SearchResponse(BaseModel):
     """搜尋回應模型"""
@@ -78,6 +79,7 @@ class SearchResponse(BaseModel):
         "search_time": 0.1,
         "total_time": 0.6
     })
+    stats: Dict[str, Any] = Field(..., description="搜索統計信息")
 
 @app.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
@@ -85,8 +87,37 @@ async def search(request: SearchRequest):
     try:
         engine = get_search_engine(request.collection)
         
-        # 執行搜尋
-        results = engine.search(
+        # 根據是否使用FAQ搜索選擇不同的搜索方法
+        if request.use_faq_search:
+            # 使用FAQ搜索（自動去重和格式化）
+            results = engine.faq_search(
+                query=request.query,
+                k=request.top_k,
+                beam_width=8,
+                embedding_fn=lambda text: get_embedding(text)[0]  # 只回傳向量，不回傳時間
+            )
+        else:
+            # 使用普通搜索
+            results = engine.search(
+                query=request.query,
+                k=request.top_k,
+                beam_width=8,
+                embedding_fn=lambda text: get_embedding(text)[0]  # 只回傳向量，不回傳時間
+            )
+        
+        return results
+    except Exception as e:
+        logger.error(f"搜尋時發生錯誤: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/faq-search", response_model=SearchResponse)
+async def faq_search(request: SearchRequest):
+    """執行FAQ專用搜尋（自動去重和格式化）"""
+    try:
+        engine = get_search_engine(request.collection)
+        
+        # 執行FAQ搜索
+        results = engine.faq_search(
             query=request.query,
             k=request.top_k,
             beam_width=8,
@@ -95,7 +126,7 @@ async def search(request: SearchRequest):
         
         return results
     except Exception as e:
-        logger.error(f"搜尋時發生錯誤: {str(e)}")
+        logger.error(f"FAQ搜尋時發生錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/collections")
@@ -116,6 +147,39 @@ async def list_collections():
                 collection_dir = manager._get_collection_dir(collection.name)
                 index_dir = manager.get_index_dir(collection.name)
                 
+                # 檢查索引目錄是否存在
+                if not index_dir.exists():
+                    logger.warning(f"索引目錄不存在: {index_dir}")
+                    collection_info = {
+                        "name": collection.name,
+                        "status": "no_index",
+                        "missing_files": ["index directory"]
+                    }
+                    result.append(collection_info)
+                    continue
+                
+                # 檢查 meta.json 文件
+                meta_path = index_dir / "meta.json"
+                if not meta_path.exists():
+                    logger.warning(f"meta.json 不存在: {meta_path}")
+                    collection_info = {
+                        "name": collection.name,
+                        "status": "incomplete",
+                        "missing_files": ["index/meta.json"]
+                    }
+                    result.append(collection_info)
+                    continue
+                
+                # 載入 meta.json 來檢查是否使用 PQ
+                try:
+                    import json
+                    with open(meta_path, 'r') as f:
+                        meta_data = json.load(f)
+                    use_pq = meta_data.get("use_pq", True)
+                except Exception as e:
+                    logger.warning(f"無法讀取 meta.json: {e}")
+                    use_pq = True  # 默認使用 PQ
+                
                 # 定義所有需要檢查的檔案
                 required_files = {
                     # 向量和元資料檔案
@@ -125,11 +189,14 @@ async def list_collections():
                     # 索引相關檔案
                     "index": {
                         "index.dat": index_dir / "index.dat",
-                        "pq_model.pkl": index_dir / "pq_model.pkl",
-                        "pq_codes.bin": index_dir / "pq_codes.bin",
                         "meta.json": index_dir / "meta.json"
                     }
                 }
+                
+                # 如果使用 PQ，則需要檢查 PQ 文件
+                if use_pq:
+                    required_files["index"]["pq_model.pkl"] = index_dir / "pq_model.pkl"
+                    required_files["index"]["pq_codes.bin"] = index_dir / "pq_codes.bin"
                 
                 # 詳細檢查每個檔案
                 file_status = {}
@@ -193,6 +260,7 @@ async def list_collections():
                     "name": collection.name,
                     "status": "ready" if has_required_files else "incomplete",
                     "file_status": file_status,
+                    "use_pq": use_pq,
                     "stats": {
                         "total_chunks": collection.chunk_stats.get("total_chunks", 0),
                         "total_questions": collection.chunk_stats.get("total_questions", 0),
@@ -205,7 +273,7 @@ async def list_collections():
                     collection_info["missing_files"] = missing_files
                     logger.warning(f"Collection '{collection.name}' 缺少檔案: {', '.join(missing_files)}")
                 else:
-                    logger.info(f"Collection '{collection.name}' 狀態完整")
+                    logger.info(f"Collection '{collection.name}' 狀態完整 (使用 PQ: {use_pq})")
                 
                 result.append(collection_info)
                 

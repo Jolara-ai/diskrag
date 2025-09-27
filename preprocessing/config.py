@@ -86,7 +86,7 @@ class PreprocessingConfig:
         }
 
 # 支持的向量維度列表（用於 PQ 量化）
-SUPPORTED_DIMENSIONS = {128, 256, 768, 1536}
+SUPPORTED_DIMENSIONS = {128, 256, 768, 960, 1536}
 
 def validate_vector_dimension(dimension: int) -> bool:
     """驗證向量維度是否支持 PQ 量化"""

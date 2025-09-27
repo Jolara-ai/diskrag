@@ -18,7 +18,7 @@ class CollectionManager:
         """初始化集合管理器
         
         Args:
-            base_dir: 集合存儲的基礎目錄，默認為當前目錄下的 collections
+            base_dir: 集合存儲的基礎目錄，預設為當前目錄下的 collections
         """
         self.base_dir = Path(base_dir) if base_dir else Path("collections")
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -317,10 +317,10 @@ class CollectionManager:
         
         # 創建新集合
         info = self.create_collection(
-            collection_name,
-            config,
-            dimension,
-            source_files
+            collection_name=collection_name,
+            config=config,
+            dimension=dimension,
+            source_files=source_files
         )
         
         # 更新集合

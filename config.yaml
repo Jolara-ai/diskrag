@@ -1,24 +1,40 @@
 # DiskRAG 設定檔
-collection: "default"
+# 大部分情況下，您只需要修改 collection 名稱
 
+# 基本設定
+collection: "default"  # 預設 collection 名稱
+
+# Embedding 設定（通常不需要修改）
 embedding:
   provider: "openai"
   model: "text-embedding-3-small"
+  api_key: null  # 將從環境變數 OPENAI_API_KEY 讀取
   max_retries: 3
   retry_delay: 2
 
+# 問題生成設定（FAQ 專用）
 question_generation:
-  enabled: false
+  enabled: false  # 需要時可用 --questions 參數開啟
   provider: "openai"
   model: "gpt-4o-mini"
   max_questions: 5
   temperature: 0.7
+  max_retries: 3
+  retry_delay: 2
 
+# 文字分塊設定
 chunk:
   size: 300
   overlap: 50
   min_size: 50
 
+# 輸出設定
 output:
   format: "parquet"
   compression: "snappy"
+
+# 索引參數區塊
+index:
+  R: 32  # Vamana 圖的最大度數
+  L: 64  # 圖建立時的搜索列表大小
+  alpha: 1.2  # 圖建立時的剪枝參數

@@ -1,18 +1,47 @@
 from dataclasses import dataclass
-from typing import List, Optional, Literal, Dict
+from typing import List, Optional, Literal, Dict, Any, Tuple
 import re
 import polars as pl
+import numpy as np
+from pathlib import Path
+import docx
+import logging
+from tqdm import tqdm
 from .config import ChunkConfig
+from .embedding import EmbeddingGenerator
+from .collection import CollectionManager
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TextChunk:
     """A chunk of text with metadata"""
     id: int
     text: str
-    source_type: Literal["faq", "article"]
+    source_type: Literal["faq", "article", "document"]
     source_id: str  # Original row ID or title
     section: Optional[str] = None
     metadata: Optional[dict] = None
+    image: Optional[str] = None
+    manual: Optional[str] = None
+
+@dataclass
+class DocumentChunk:
+    """Document chunk with additional metadata for markdown/docx files"""
+    id: int
+    text: str
+    image: Optional[str]
+    section: str
+    manual: str
+    
+    @classmethod
+    def is_valid_text(cls, text: str, min_length: int = 50, max_length: int = 300) -> bool:
+        text = re.sub(r'\s+', ' ', text).strip()
+        if not min_length <= len(text) <= max_length:
+            return False
+        if re.match(r'^[\s\W]+$', text):
+            return False
+        return True
 
 class TextChunker:
     def __init__(self, config: ChunkConfig):
@@ -130,6 +159,300 @@ class TextChunker:
                 "Unsupported CSV format. Must be either FAQ (question, answer_text) "
                 "or Article (title, paragraph_text) format."
             )
+
+    def process_markdown(self, file_path: Path) -> List[DocumentChunk]:
+        """Process markdown file and extract chunks"""
+        chunks = []
+        current_section = "未分類"
+        current_text = []
+        current_image = None
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        sections = re.split(r'(?=^# )', content, flags=re.MULTILINE)
+        
+        for section in sections:
+            lines = section.strip().split('\n')
+            if not lines:
+                continue
+                
+            if lines[0].startswith('# '):
+                current_section = lines[0][2:].strip()
+                lines = lines[1:]
+                
+            for line in lines:
+                img_match = re.search(r'!\[.*?\]\((.*?)\)', line)
+                if img_match:
+                    current_image = img_match.group(1)
+                    continue
+                    
+                if not line.strip():
+                    continue
+                    
+                current_text.append(line)
+                chunk_text = ' '.join(current_text)
+                
+                if DocumentChunk.is_valid_text(chunk_text, 
+                                              min_length=self.config.min_size,
+                                              max_length=self.config.size):
+                    chunks.append(DocumentChunk(
+                        id=len(chunks),
+                        text=chunk_text,
+                        image=current_image,
+                        section=current_section,
+                        manual=file_path.name
+                    ))
+                    current_text = []
+                    current_image = None
+        
+        if current_text:
+            chunk_text = ' '.join(current_text)
+            if DocumentChunk.is_valid_text(chunk_text,
+                                          min_length=self.config.min_size,
+                                          max_length=self.config.size):
+                chunks.append(DocumentChunk(
+                    id=len(chunks),
+                    text=chunk_text,
+                    image=current_image,
+                    section=current_section,
+                    manual=file_path.name
+                ))
+        
+        return chunks
+
+    def process_docx(self, file_path: Path) -> List[DocumentChunk]:
+        """Process docx file and extract chunks"""
+        doc = docx.Document(file_path)
+        chunks = []
+        current_section = "未分類"
+        current_text = []
+        
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if not text:
+                continue
+                
+            if para.style.name.startswith('Heading'):
+                if current_text:
+                    chunk_text = ' '.join(current_text)
+                    if DocumentChunk.is_valid_text(chunk_text,
+                                                  min_length=self.config.min_size,
+                                                  max_length=self.config.size):
+                        chunks.append(DocumentChunk(
+                            id=len(chunks),
+                            text=chunk_text,
+                            image=None,
+                            section=current_section,
+                            manual=file_path.name
+                        ))
+                current_section = text
+                current_text = []
+            else:
+                current_text.append(text)
+                chunk_text = ' '.join(current_text)
+                
+                if DocumentChunk.is_valid_text(chunk_text,
+                                              min_length=self.config.min_size,
+                                              max_length=self.config.size):
+                    chunks.append(DocumentChunk(
+                        id=len(chunks),
+                        text=chunk_text,
+                        image=None,
+                        section=current_section,
+                        manual=file_path.name
+                    ))
+                    current_text = []
+        
+        if current_text:
+            chunk_text = ' '.join(current_text)
+            if DocumentChunk.is_valid_text(chunk_text,
+                                          min_length=self.config.min_size,
+                                          max_length=self.config.size):
+                chunks.append(DocumentChunk(
+                    id=len(chunks),
+                    text=chunk_text,
+                    image=None,
+                    section=current_section,
+                    manual=file_path.name
+                ))
+        
+        return chunks
+
+    def get_embeddings(self, texts: List[str], embedding_generator: EmbeddingGenerator) -> Tuple[np.ndarray, List[int]]:
+        """Generate embeddings for text chunks"""
+        embeddings = []
+        valid_indices = []
+        
+        for i, text in enumerate(tqdm(texts, desc="生成向量")):
+            if not DocumentChunk.is_valid_text(text,
+                                              min_length=self.config.min_size,
+                                              max_length=self.config.size):
+                logger.debug(f"跳過無效文字 (ID: {i}): {text[:50]}...")
+                continue
+                
+            try:
+                embedding = embedding_generator.generate(text)
+                embeddings.append(embedding)
+                valid_indices.append(i)
+            except Exception as e:
+                logger.warning(f"跳過文字 (ID: {i}) 的向量生成: {str(e)}")
+                continue
+                
+        return np.array(embeddings) if embeddings else np.array([]), valid_indices
+
+
+class DocumentProcessor:
+    """Document processor for handling markdown and docx files with collection management"""
+    
+    def __init__(self,
+                 collection_name: str,
+                 manual_dir: str = "data/manual",
+                 config_path: str = "config.yaml",
+                 embedding_model: Optional[str] = None,
+                 batch_size: int = 50):
+        self.collection_name = collection_name
+        self.manual_dir = Path(manual_dir)
+        self.batch_size = batch_size
+        self.config_path = config_path
+        self.manual_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Load configuration
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.config = yaml.safe_load(f)
+        except FileNotFoundError:
+            logger.warning(f"配置文件 {config_path} 不存在，使用預設設定")
+            self.config = {}
+        except yaml.YAMLError as e:
+            logger.error(f"解析配置文件時出錯: {e}")
+            raise
+        
+        # Initialize embedding generator
+        from .config import EmbeddingConfig
+        embedding_config = EmbeddingConfig(
+            provider=self.config.get('embedding', {}).get('provider', 'openai'),
+            model=embedding_model or self.config.get('embedding', {}).get('model', 'text-embedding-3-small'),
+            api_key=None,
+            max_retries=self.config.get('embedding', {}).get('max_retries', 3),
+            retry_delay=self.config.get('embedding', {}).get('retry_delay', 2)
+        )
+        self.embedding_generator = EmbeddingGenerator(embedding_config)
+        
+        # Initialize collection manager
+        self.collection_manager = CollectionManager()
+        collection_info = self.collection_manager.get_collection_info(collection_name)
+        
+        if collection_info is None:
+            dimension = self.embedding_generator.get_embedding_dimension()
+            config = self._create_collection_config(embedding_model)
+            self.collection_manager.create_collection(
+                collection_name=collection_name,
+                config=config,
+                dimension=dimension,
+                source_files=[]
+            )
+            collection_info = self.collection_manager.get_collection_info(collection_name)
+        
+        self.collection_info = collection_info
+        
+        # Initialize chunker
+        from .config import ChunkConfig
+        chunk_config = ChunkConfig(
+            size=self.config.get('chunk', {}).get('size', 300),
+            overlap=self.config.get('chunk', {}).get('overlap', 50),
+            min_size=self.config.get('chunk', {}).get('min_size', 50)
+        )
+        self.chunker = TextChunker(chunk_config)
+
+    def _create_collection_config(self, embedding_model: Optional[str] = None) -> Dict[str, Any]:
+        return {
+            "collection": self.collection_name,
+            "embedding": {
+                "provider": self.config.get('embedding', {}).get('provider', 'openai'),
+                "model": embedding_model or self.config.get('embedding', {}).get('model', 'text-embedding-3-small'),
+                "api_key": None,
+                "max_retries": self.config.get('embedding', {}).get('max_retries', 3),
+                "retry_delay": self.config.get('embedding', {}).get('retry_delay', 2)
+            },
+            "question_generation": self.config.get('question_generation', {
+                "enabled": False,
+                "provider": "openai",
+                "model": "gpt-3.5-turbo",
+                "max_questions": 5,
+                "temperature": 0.7,
+                "max_retries": 3,
+                "retry_delay": 2
+            }),
+            "chunk": self.config.get('chunk', {
+                "size": 300,
+                "overlap": 50,
+                "min_size": 50
+            }),
+            "output": self.config.get('output', {
+                "format": "parquet",
+                "compression": "snappy"
+            })
+        }
+
+    def process_all_documents(self):
+        """Process all markdown and docx files in the manual directory"""
+        try:
+            manual_path = Path(self.manual_dir)
+            if not manual_path.exists():
+                logger.error(f"目錄不存在: {self.manual_dir}")
+                return
+            
+            all_files = []
+            for ext in [".md", ".docx"]:
+                all_files.extend(list(manual_path.glob(f"*{ext}")))
+            
+            if not all_files:
+                logger.warning(f"在 {self.manual_dir} 中沒有找到需要處理的文檔")
+                return
+            
+            all_files.sort()
+            total_chunks = 0
+            processed_files = []
+            
+            for file_path in tqdm(all_files, desc="處理文檔"):
+                logger.info(f"處理文件: {file_path}")
+                try:
+                    if file_path.suffix == ".md":
+                        chunks = self.chunker.process_markdown(file_path)
+                    elif file_path.suffix == ".docx":
+                        chunks = self.chunker.process_docx(file_path)
+                    else:
+                        logger.warning(f"不支持的文件類型: {file_path.suffix}")
+                        continue
+                    
+                    if chunks:
+                        total_chunks += len(chunks)
+                        processed_files.append(file_path.name)
+                        
+                except Exception as e:
+                    logger.error(f"處理文件 {file_path} 時出錯: {str(e)}")
+                    continue
+            
+            if not total_chunks:
+                logger.warning("沒有成功處理任何文檔")
+                return
+            
+            # Update collection info
+            info = self.collection_manager.get_collection_info(self.collection_name)
+            if info:
+                info.chunk_stats.update({
+                    "total_chunks": total_chunks,
+                    "last_processed_files": processed_files
+                })
+                self.collection_manager.save_collection_info(self.collection_name, info)
+            
+            logger.info(f"成功處理 {total_chunks} 個文本塊，來自 {len(processed_files)} 個文件")
+            
+        except Exception as e:
+            logger.error(f"處理文檔時出錯: {str(e)}")
+            raise
 
 def split_markdown(content: str, chunk_size: int = 300, overlap: int = 50) -> List[Dict[str, str]]:
     """將 Markdown 文本分割成塊

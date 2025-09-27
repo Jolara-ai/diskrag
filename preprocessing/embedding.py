@@ -3,6 +3,24 @@ from typing import List, Optional, Tuple
 import numpy as np
 import logging
 import time
+import os
+
+# 載入環境變數
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # 如果沒有安裝 python-dotenv，嘗試手動載入 .env 文件
+    from pathlib import Path
+    env_file = Path('.env')
+    if env_file.exists():
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
 from openai import OpenAI
 from .config import EmbeddingConfig
 
@@ -23,7 +41,15 @@ class EmbeddingGenerator:
     def _setup_clients(self):
         """Setup embedding clients based on configuration"""
         if self.config.provider == "openai":
-            self.openai_client = OpenAI()
+            # 檢查 OpenAI API Key
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError(
+                    "OPENAI_API_KEY 環境變數未設置。請：\n"
+                    "1. 在 .env 文件中設置 OPENAI_API_KEY=your-api-key\n"
+                    "2. 或設置環境變數：export OPENAI_API_KEY=your-api-key"
+                )
+            self.openai_client = OpenAI(api_key=api_key)
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
