@@ -6,7 +6,6 @@ DiskANN PQ 模組
 """
 
 from .fast_pq import DiskANNPQ, FastPQ
-from .pq_model import DiskANNPQSearch, SimplePQ
 from .adaptive_pq import (
     AdaptivePQCalculator,
     PQRecommendation,
@@ -17,8 +16,6 @@ from .adaptive_pq import (
 __all__ = [
     'DiskANNPQ',
     'FastPQ', 
-    'DiskANNPQSearch',
-    'SimplePQ',
     'AdaptivePQCalculator',
     'PQRecommendation',
     'calculate_adaptive_pq_params',
