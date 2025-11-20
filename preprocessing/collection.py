@@ -225,6 +225,28 @@ class CollectionManager:
         
         # 加載現有元數據
         metadata_df = pl.read_parquet(self.get_metadata_path(collection_name))
+        
+        # 確保現有 metadata 是字串格式（統一格式）
+        if "metadata" in metadata_df.columns:
+            # 如果 metadata 是 Struct 或其他類型，轉換為字串
+            if metadata_df["metadata"].dtype != pl.String:
+                logger.debug("轉換現有 metadata 為字串格式...")
+                # 將 metadata 轉換為字串
+                metadata_list = []
+                for row in metadata_df.iter_rows(named=True):
+                    meta = row["metadata"]
+                    if isinstance(meta, dict):
+                        meta_str = json.dumps(meta, ensure_ascii=False)
+                    elif isinstance(meta, str):
+                        meta_str = meta
+                    else:
+                        meta_str = str(meta)
+                    metadata_list.append(meta_str)
+                
+                metadata_df = metadata_df.with_columns([
+                    pl.Series("metadata", metadata_list, dtype=pl.String)
+                ])
+        
         existing_hashes = set(metadata_df["text_hash"].to_list())
         
         # 過濾重複文本
@@ -246,22 +268,84 @@ class CollectionManager:
             logger.info(f"沒有新的文本需要添加到集合 {collection_name}")
             return info
         
+        # 記錄新增的向量數量（在合併前）
+        num_new_vectors = len(new_vectors)
+        
         # 更新向量文件
         vectors_path = self.get_vectors_path(collection_name)
         if info.num_vectors > 0:
             existing_vectors = np.load(vectors_path)
-            new_vectors = np.vstack([existing_vectors, new_vectors])
-        np.save(vectors_path, new_vectors)
+            all_vectors = np.vstack([existing_vectors, new_vectors])
+        else:
+            all_vectors = np.array(new_vectors)
+        np.save(vectors_path, all_vectors)
         
         # 更新元數據
+        # 確保所有列表長度一致（使用新增的數量，不是合併後的總數）
+        assert len(new_texts) == len(new_hashes) == len(new_metadata) == num_new_vectors, (
+            f"資料長度不一致: texts={len(new_texts)}, hashes={len(new_hashes)}, "
+            f"metadata={len(new_metadata)}, vectors={num_new_vectors}"
+        )
+        
+        # 更新 metadata 中的 vector_index（使用實際的向量索引）
+        # 注意：vector_index 應該對應到合併後的向量陣列中的位置
+        for i, metadata in enumerate(new_metadata):
+            if isinstance(metadata, dict):
+                metadata["vector_index"] = info.num_vectors + i
+            # 如果 metadata 是字串（JSON），則在建立 DataFrame 時處理
+        
+        # 建立 vector_index 列表（確保長度與 new_texts 一致，使用新增的數量）
+        vector_indices = list(range(info.num_vectors, info.num_vectors + num_new_vectors))
+        
+        # 確保 metadata 是字串格式（如果是 dict 則轉換為 JSON）
+        metadata_strs = []
+        for m in new_metadata:
+            if isinstance(m, dict):
+                metadata_strs.append(json.dumps(m, ensure_ascii=False))
+            else:
+                metadata_strs.append(m)
+        
         new_metadata_df = pl.DataFrame({
             "text": new_texts,
             "text_hash": new_hashes,
-            "metadata": new_metadata,
-            "vector_index": list(range(info.num_vectors, info.num_vectors + len(new_vectors)))
+            "metadata": metadata_strs,
+            "vector_index": vector_indices
         })
         
+        # 驗證 DataFrame 的長度一致性
+        if len(new_metadata_df) != len(new_texts):
+            raise ValueError(
+                f"DataFrame 建立失敗: 行數不一致 "
+                f"(texts={len(new_texts)}, df={len(new_metadata_df)})"
+            )
+        
         if info.num_vectors > 0:
+            # 確保兩個 DataFrame 的 metadata 欄位都是字串類型
+            # 重新讀取並轉換現有 metadata（以防萬一）
+            if metadata_df["metadata"].dtype != pl.String:
+                logger.debug("再次轉換現有 metadata 為字串格式...")
+                metadata_list = []
+                for row in metadata_df.iter_rows(named=True):
+                    meta = row["metadata"]
+                    if isinstance(meta, dict):
+                        meta_str = json.dumps(meta, ensure_ascii=False)
+                    elif isinstance(meta, str):
+                        meta_str = meta
+                    else:
+                        meta_str = str(meta)
+                    metadata_list.append(meta_str)
+                
+                metadata_df = metadata_df.with_columns([
+                    pl.Series("metadata", metadata_list, dtype=pl.String)
+                ])
+            
+            # 確保 new_metadata_df 的 metadata 也是字串類型
+            if new_metadata_df["metadata"].dtype != pl.String:
+                new_metadata_df = new_metadata_df.with_columns([
+                    pl.Series("metadata", new_metadata_df["metadata"].to_list(), dtype=pl.String)
+                ])
+            
+            # 合併 DataFrame
             metadata_df = pl.concat([metadata_df, new_metadata_df])
         else:
             metadata_df = new_metadata_df
@@ -269,19 +353,20 @@ class CollectionManager:
         metadata_df.write_parquet(self.get_metadata_path(collection_name))
         
         # 更新集合信息
-        info.num_vectors = len(new_vectors)
+        info.num_vectors = len(all_vectors)
         info.updated_at = datetime.now().isoformat()
         info.text_hashes.update(new_hashes)
         
         # 更新向量偏移量
         for i, text_hash in enumerate(new_hashes):
-            info.vector_offsets[text_hash] = info.num_vectors - len(new_vectors) + i
+            info.vector_offsets[text_hash] = info.num_vectors - num_new_vectors + i
         
         self.save_collection_info(collection_name, info)
         logger.info(
             f"已更新集合 {collection_name}，"
-            f"添加了 {len(new_vectors)} 個新向量，"
-            f"跳過了 {len(texts) - len(new_vectors)} 個重複文本"
+            f"添加了 {num_new_vectors} 個新向量，"
+            f"跳過了 {len(texts) - num_new_vectors} 個重複文本，"
+            f"總共 {len(all_vectors)} 個向量"
         )
         
         return info
@@ -356,24 +441,54 @@ class CollectionManager:
             return None
         
         text = row["text"][0]
-        metadata = row["metadata"][0]
+        metadata_raw = row["metadata"][0]
         
-        # 確保 metadata 是字典類型
-        if isinstance(metadata, str):
+        # 處理 metadata：可能是 Polars Struct、字串或字典
+        metadata = {}
+        
+        if isinstance(metadata_raw, str):
+            # 字串格式，嘗試解析為 JSON
             try:
-                metadata = json.loads(metadata)
+                metadata = json.loads(metadata_raw)
             except json.JSONDecodeError:
-                # 如果無法解析為 JSON，創建一個包含基本信息的字典
-                metadata = {
-                    "text": text,
-                    "id": index
-                }
-        elif not isinstance(metadata, dict):
-            # 如果 metadata 既不是字符串也不是字典，創建一個基本字典
-            metadata = {
-                "text": text,
-                "id": index
-            }
+                metadata = {"text": text, "id": index}
+        elif isinstance(metadata_raw, dict):
+            # 已經是字典
+            metadata = metadata_raw
+        else:
+            # Polars Struct 類型，需要轉換
+            try:
+                # 使用 struct.field() 提取所有欄位
+                struct_schema = row.schema["metadata"]
+                if hasattr(struct_schema, 'fields'):
+                    # 提取所有欄位
+                    for field in struct_schema.fields:
+                        field_name = field.name
+                        try:
+                            # 從 row 中提取 struct 欄位值
+                            field_series = row.select(pl.col("metadata").struct.field(field_name))
+                            if len(field_series) > 0:
+                                field_value = field_series[0, 0]  # 取得實際值
+                                metadata[field_name] = field_value
+                        except Exception as e:
+                            logger.debug(f"無法提取欄位 {field_name}: {e}")
+                            pass
+            except Exception as e:
+                logger.warning(f"無法轉換 metadata Struct: {e}")
+                metadata = {"text": text, "id": index}
+        
+        # 如果 metadata 中有嵌套的 metadata 字串，解析它
+        if isinstance(metadata, dict) and "metadata" in metadata:
+            nested_meta_str = metadata.get("metadata")
+            if isinstance(nested_meta_str, str):
+                try:
+                    nested_meta = json.loads(nested_meta_str)
+                    # 合併嵌套的 metadata（不覆蓋頂層欄位）
+                    for key, value in nested_meta.items():
+                        if key not in metadata:
+                            metadata[key] = value
+                except json.JSONDecodeError:
+                    pass
         
         return text, metadata
     

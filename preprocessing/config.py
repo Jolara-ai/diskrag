@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Literal, Dict, Any, List, Set
 import yaml
-from pydantic import BaseModel, Field
 from datetime import datetime
 import json
 import hashlib

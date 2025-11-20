@@ -4,7 +4,6 @@ import re
 import polars as pl
 import numpy as np
 from pathlib import Path
-import docx
 import logging
 from tqdm import tqdm
 from .config import ChunkConfig
@@ -27,7 +26,7 @@ class TextChunk:
 
 @dataclass
 class DocumentChunk:
-    """Document chunk with additional metadata for markdown/docx files"""
+    """Document chunk with additional metadata for markdown files"""
     id: int
     text: str
     image: Optional[str]
@@ -221,63 +220,6 @@ class TextChunker:
         
         return chunks
 
-    def process_docx(self, file_path: Path) -> List[DocumentChunk]:
-        """Process docx file and extract chunks"""
-        doc = docx.Document(file_path)
-        chunks = []
-        current_section = "未分類"
-        current_text = []
-        
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if not text:
-                continue
-                
-            if para.style.name.startswith('Heading'):
-                if current_text:
-                    chunk_text = ' '.join(current_text)
-                    if DocumentChunk.is_valid_text(chunk_text,
-                                                  min_length=self.config.min_size,
-                                                  max_length=self.config.size):
-                        chunks.append(DocumentChunk(
-                            id=len(chunks),
-                            text=chunk_text,
-                            image=None,
-                            section=current_section,
-                            manual=file_path.name
-                        ))
-                current_section = text
-                current_text = []
-            else:
-                current_text.append(text)
-                chunk_text = ' '.join(current_text)
-                
-                if DocumentChunk.is_valid_text(chunk_text,
-                                              min_length=self.config.min_size,
-                                              max_length=self.config.size):
-                    chunks.append(DocumentChunk(
-                        id=len(chunks),
-                        text=chunk_text,
-                        image=None,
-                        section=current_section,
-                        manual=file_path.name
-                    ))
-                    current_text = []
-        
-        if current_text:
-            chunk_text = ' '.join(current_text)
-            if DocumentChunk.is_valid_text(chunk_text,
-                                          min_length=self.config.min_size,
-                                          max_length=self.config.size):
-                chunks.append(DocumentChunk(
-                    id=len(chunks),
-                    text=chunk_text,
-                    image=None,
-                    section=current_section,
-                    manual=file_path.name
-                ))
-        
-        return chunks
 
     def get_embeddings(self, texts: List[str], embedding_generator: EmbeddingGenerator) -> Tuple[np.ndarray, List[int]]:
         """Generate embeddings for text chunks"""
@@ -303,7 +245,7 @@ class TextChunker:
 
 
 class DocumentProcessor:
-    """Document processor for handling markdown and docx files with collection management"""
+    """Document processor for handling markdown files with collection management"""
     
     def __init__(self,
                  collection_name: str,
@@ -397,19 +339,17 @@ class DocumentProcessor:
         }
 
     def process_all_documents(self):
-        """Process all markdown and docx files in the manual directory"""
+        """Process all markdown files in the manual directory"""
         try:
             manual_path = Path(self.manual_dir)
             if not manual_path.exists():
                 logger.error(f"目錄不存在: {self.manual_dir}")
                 return
             
-            all_files = []
-            for ext in [".md", ".docx"]:
-                all_files.extend(list(manual_path.glob(f"*{ext}")))
+            all_files = list(manual_path.glob("*.md"))
             
             if not all_files:
-                logger.warning(f"在 {self.manual_dir} 中沒有找到需要處理的文檔")
+                logger.warning(f"在 {self.manual_dir} 中沒有找到需要處理的 Markdown 文檔")
                 return
             
             all_files.sort()
@@ -419,13 +359,7 @@ class DocumentProcessor:
             for file_path in tqdm(all_files, desc="處理文檔"):
                 logger.info(f"處理文件: {file_path}")
                 try:
-                    if file_path.suffix == ".md":
-                        chunks = self.chunker.process_markdown(file_path)
-                    elif file_path.suffix == ".docx":
-                        chunks = self.chunker.process_docx(file_path)
-                    else:
-                        logger.warning(f"不支持的文件類型: {file_path.suffix}")
-                        continue
+                    chunks = self.chunker.process_markdown(file_path)
                     
                     if chunks:
                         total_chunks += len(chunks)
@@ -533,58 +467,6 @@ def split_markdown(content: str, chunk_size: int = 300, overlap: int = 50) -> Li
     except Exception as e:
         logger.error(f"分割 Markdown 文本時出錯: {str(e)}")
         raise ValueError(f"文本分割失敗: {str(e)}")
-
-def split_docx(paragraphs: List[str], chunk_size: int = 300, overlap: int = 50) -> List[Dict[str, str]]:
-    """將 Word 文檔段落分割成塊
-    
-    Args:
-        paragraphs: 段落列表
-        chunk_size: 每個塊的最大字符數
-        overlap: 相鄰塊之間的重疊字符數
-        
-    Returns:
-        List[Dict[str, str]]: 包含文本塊和元數據的列表
-    """
-    try:
-        chunks = []
-        current_section = "未分類"
-        current_text = ""
-        
-        for para in paragraphs:
-            if not para.strip():
-                continue
-                
-            # 檢查是否為標題（簡單啟發式方法）
-            if len(para) < 100 and para.strip().endswith(':'):
-                # 如果當前有文本，先處理它
-                if current_text:
-                    text_chunks = split_text(current_text, chunk_size, overlap)
-                    for chunk in text_chunks:
-                        chunks.append({
-                            "text": chunk,
-                            "section": current_section,
-                            "image": None
-                        })
-                    current_text = ""
-                current_section = para.strip()
-            else:
-                current_text += para.strip() + "\n\n"
-        
-        # 處理最後的文本
-        if current_text:
-            text_chunks = split_text(current_text, chunk_size, overlap)
-            for chunk in text_chunks:
-                chunks.append({
-                    "text": chunk,
-                    "section": current_section,
-                    "image": None
-                })
-        
-        return chunks
-        
-    except Exception as e:
-        logger.error(f"分割 Word 文檔時出錯: {str(e)}")
-        raise ValueError(f"文檔分割失敗: {str(e)}")
 
 def split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     """將文本分割成指定大小的塊

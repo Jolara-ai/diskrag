@@ -4,6 +4,9 @@ import numpy as np
 import logging
 import time
 import os
+import hashlib
+import json
+from pathlib import Path
 
 # 載入環境變數
 try:
@@ -22,7 +25,7 @@ except ImportError:
                     os.environ[key.strip()] = value.strip()
 
 from openai import OpenAI
-from .config import EmbeddingConfig
+from .config import EmbeddingConfig, get_text_hash
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +37,22 @@ class EmbeddingResult:
     metadata: Optional[dict] = None
 
 class EmbeddingGenerator:
-    def __init__(self, config: EmbeddingConfig):
+    def __init__(self, config: EmbeddingConfig, cache_dir: Optional[Path] = None):
         self.config = config
         self._setup_clients()
+        
+        # 設定暫存目錄
+        if cache_dir is None:
+            cache_dir = Path(".cache/embeddings")
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 建立暫存 key（基於 provider 和 model）
+        cache_key = f"{config.provider}_{config.model}".replace("/", "_").replace(":", "_")
+        self.cache_subdir = self.cache_dir / cache_key
+        self.cache_subdir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Embedding 暫存目錄: {self.cache_subdir}")
 
     def _setup_clients(self):
         """Setup embedding clients based on configuration"""
@@ -53,11 +69,40 @@ class EmbeddingGenerator:
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
-    def generate(self, text: str) -> np.ndarray:
+    def _get_cache_path(self, text: str) -> Path:
+        """取得暫存檔案路徑"""
+        text_hash = get_text_hash(text)
+        return self.cache_subdir / f"{text_hash}.npz"
+    
+    def _load_from_cache(self, text: str) -> Optional[np.ndarray]:
+        """從暫存載入 embedding"""
+        cache_path = self._get_cache_path(text)
+        if cache_path.exists():
+            try:
+                data = np.load(cache_path)
+                vector = data['vector']
+                logger.debug(f"從暫存載入 embedding: {text[:50]}...")
+                return vector
+            except Exception as e:
+                logger.warning(f"載入暫存失敗: {str(e)}")
+                return None
+        return None
+    
+    def _save_to_cache(self, text: str, vector: np.ndarray) -> None:
+        """儲存 embedding 到暫存"""
+        cache_path = self._get_cache_path(text)
+        try:
+            np.savez_compressed(cache_path, vector=vector)
+            logger.debug(f"儲存 embedding 到暫存: {text[:50]}...")
+        except Exception as e:
+            logger.warning(f"儲存暫存失敗: {str(e)}")
+    
+    def generate(self, text: str, use_cache: bool = True) -> np.ndarray:
         """生成單個文本的 embedding 向量
         
         Args:
             text: 要生成向量的文本
+            use_cache: 是否使用暫存（預設為 True）
             
         Returns:
             np.ndarray: 文本的 embedding 向量
@@ -65,6 +110,13 @@ class EmbeddingGenerator:
         Raises:
             RuntimeError: 如果生成向量失敗
         """
+        # 嘗試從暫存載入
+        if use_cache:
+            cached_vector = self._load_from_cache(text)
+            if cached_vector is not None:
+                return cached_vector
+        
+        # 生成新的 embedding
         if self.config.provider == "openai":
             vector = self._get_openai_embedding(text, self.config.max_retries)
         else:
@@ -72,6 +124,10 @@ class EmbeddingGenerator:
             
         if vector is None:
             raise RuntimeError(f"Failed to generate embedding for text: {text[:50]}...")
+        
+        # 儲存到暫存
+        if use_cache:
+            self._save_to_cache(text, vector)
             
         return vector
 
@@ -93,14 +149,40 @@ class EmbeddingGenerator:
 
     def generate_embeddings(self, 
                           texts: List[str],
-                          metadata_list: Optional[List[dict]] = None) -> Tuple[List[EmbeddingResult], List[int]]:
-        """Generate embeddings for a list of texts"""
+                          metadata_list: Optional[List[dict]] = None,
+                          use_cache: bool = True) -> Tuple[List[EmbeddingResult], List[int]]:
+        """Generate embeddings for a list of texts
+        
+        Args:
+            texts: 文字列表
+            metadata_list: 元數據列表（可選）
+            use_cache: 是否使用暫存（預設為 True）
+            
+        Returns:
+            Tuple[List[EmbeddingResult], List[int]]: (結果列表, 有效索引列表)
+        """
         results = []
         valid_indices = []
         
+        # 統計暫存命中率
+        cache_hits = 0
+        cache_misses = 0
+        
         for i, (text, metadata) in enumerate(zip(texts, metadata_list or [None] * len(texts))):
             try:
-                vector = self.generate(text)
+                # 檢查暫存
+                if use_cache:
+                    cached_vector = self._load_from_cache(text)
+                    if cached_vector is not None:
+                        vector = cached_vector
+                        cache_hits += 1
+                    else:
+                        vector = self.generate(text, use_cache=True)
+                        cache_misses += 1
+                else:
+                    vector = self.generate(text, use_cache=False)
+                    cache_misses += 1
+                
                 results.append(EmbeddingResult(
                     vector=vector,
                     text=text,
@@ -110,6 +192,12 @@ class EmbeddingGenerator:
             except Exception as e:
                 logger.error(f"Failed to generate embedding for text {i}: {str(e)}")
                 continue
+        
+        # 記錄暫存統計
+        if use_cache and (cache_hits > 0 or cache_misses > 0):
+            total = cache_hits + cache_misses
+            hit_rate = (cache_hits / total * 100) if total > 0 else 0
+            logger.info(f"Embedding 暫存統計: {cache_hits}/{total} 命中 ({hit_rate:.1f}%)")
                 
         return results, valid_indices
 
