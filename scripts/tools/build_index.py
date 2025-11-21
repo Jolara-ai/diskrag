@@ -54,7 +54,6 @@ def calculate_adaptive_search_L(n_points: int, target_recall: float = 0.85) -> i
     elif n_points <= 100000:
         base_L = 10 * (15 + 2 * math.log10(n_points))
     else:
-        # 基於500k點需要L=3000+的發現
         base_L = 10 * (20 + 3 * math.log10(n_points))
     
     if target_recall >= 0.9:
@@ -96,10 +95,24 @@ def build_index(
 
     vectors = np.load(str(vectors_path))
     
-    # 🔥 關鍵修復 1: 確保數據類型一致性
+    
     if vectors.dtype != np.float32:
         logger.warning(f"⚠️  轉換向量數據類型從 {vectors.dtype} 到 float32")
         vectors = vectors.astype(np.float32)
+    
+    
+    if vectors.ndim == 1:
+        # 如果是一維數組，轉換為二維（1, dim）
+        vectors = vectors.reshape(1, -1)
+        logger.warning(f"⚠️  向量是一維數組，已轉換為二維: {vectors.shape}")
+    elif vectors.ndim > 2:
+        # 如果是多維數組，展平為二維
+        vectors = vectors.reshape(-1, vectors.shape[-1])
+        logger.warning(f"⚠️  向量是多維數組，已展平為二維: {vectors.shape}")
+    
+    # 確保是二維數組後再解包
+    if vectors.ndim != 2:
+        raise ValueError(f"向量形狀不正確: {vectors.shape}，期望二維數組 (n_points, dimension)")
     
     n_points, dimension = vectors.shape
     
@@ -112,7 +125,7 @@ def build_index(
     use_pq = True
     logger.info(f"載入向量數據: {vectors.shape}, dtype: {vectors.dtype}")
     
-    # 🔥 關鍵修復 2: 記錄向量統計信息用於後續驗證
+
     logger.info(f"🔍 建立索引時向量統計:")
     logger.info(f"  - 數據類型: {vectors.dtype}")
     logger.info(f"  - 形狀: {vectors.shape}")
@@ -156,13 +169,11 @@ def build_index(
     pq_params = calculate_adaptive_pq_params(n_points, dimension, target_accuracy)
     adaptive_pq_m = pq_params["n_subvectors"]
     
-    # 🔥 關鍵修復 3: 處理小數據集的情況（但始終使用 PQ，因為資料量已足夠）
-    # 注意：由於已經確保 n_points >= 16，所以始終使用 PQ
     if pq_params["recommendation"] == "brute_force" and n_points >= 256:
         logger.warning(f"⚠️  根據 PQ 推薦，將使用暴力搜索模式")
         use_pq = False
         adaptive_pq_m = 8  # 使用最小配置作為fallback
-    # 對於小數據集（16-255 點），仍然使用 PQ（因為已經通過最小數量檢查）
+    
     
     logger.info(f"🎯 PQ 參數: {adaptive_pq_m}×256 (數據規模: {n_points}, 維度: {dimension})")
     logger.info(f"🎯 使用 PQ: {use_pq}")
@@ -192,6 +203,8 @@ def build_index(
     # 1. 訓練並保存 PQ 模型（如果使用 PQ）
     pq_model = None
     pq_codes = None
+    avg_error = 0.0
+    selectivity = 0.0
     if use_pq:
         logger.info(f"訓練 DiskANN PQ 模型 (m={adaptive_pq_m}, bits={pq_bits})...")
         try:
@@ -219,7 +232,6 @@ def build_index(
             pq_codes = pq_model.encode(vectors)
             logger.info(f"PQ 編碼完成，編碼形狀: {pq_codes.shape}")
             
-            # 🔥 關鍵修復 5: 測試編碼解碼一致性
             logger.info("🔍 測試 PQ 編碼解碼一致性...")
             test_vectors = vectors[:5]  # 取前5個向量測試
             test_codes = pq_model.encode(test_vectors)
@@ -235,11 +247,9 @@ def build_index(
 
             persist = DiskANNPersist(dim=vectors.shape[1], R=adaptive_R)
             
-            # 🔥 關鍵修復 6: 使用改進的保存方法並立即驗證
             logger.info("🔧 保存 PQ 模型並進行驗證...")
             persist.save_pq_codebook(str(index_dir / "pq_model.pkl"), pq_model)
             
-            # 立即重新加載並驗證
             logger.info("🔍 驗證 PQ 模型保存/加載完整性...")
             test_loaded_pq = persist.load_pq_codebook(str(index_dir / "pq_model.pkl"))
             
