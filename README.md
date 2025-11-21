@@ -281,8 +281,6 @@ diskrag index my_collection --target-quality high
 詳細配置說明請參考 [configs/README.md](configs/README.md)
 
 
-- [配置說明](configs/README.md) - 詳細的配置選項
-
 
 ## 常見問題
 
