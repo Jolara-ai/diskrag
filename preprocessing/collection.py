@@ -232,7 +232,7 @@ class CollectionManager:
             if metadata_df["metadata"].dtype != pl.String:
                 logger.debug("轉換現有 metadata 為字串格式...")
                 # 將 metadata 轉換為字串
-                metadata_list = []
+                existing_metadata_list = []
                 for row in metadata_df.iter_rows(named=True):
                     meta = row["metadata"]
                     if isinstance(meta, dict):
@@ -241,10 +241,10 @@ class CollectionManager:
                         meta_str = meta
                     else:
                         meta_str = str(meta)
-                    metadata_list.append(meta_str)
+                    existing_metadata_list.append(meta_str)
                 
                 metadata_df = metadata_df.with_columns([
-                    pl.Series("metadata", metadata_list, dtype=pl.String)
+                    pl.Series("metadata", existing_metadata_list, dtype=pl.String)
                 ])
         
         existing_hashes = set(metadata_df["text_hash"].to_list())
@@ -265,7 +265,24 @@ class CollectionManager:
                 new_hashes.append(text_hash)
         
         if not new_vectors:
-            logger.info(f"沒有新的文字需要添加到集合 {collection_name}")
+            logger.warning(f"⚠️  沒有新的文字需要添加到集合 {collection_name}")
+            logger.warning(f"   輸入文本數量: {len(texts)}")
+            logger.warning(f"   現有文本哈希數量: {len(existing_hashes)}")
+            logger.warning(f"   這可能意味著所有文本都是重複的，或者處理過程中出現問題")
+            # 即使沒有新向量，也確保向量文件是正確的二維形狀
+            vectors_path = self.get_vectors_path(collection_name)
+            existing_vectors = np.load(vectors_path)
+            if existing_vectors.ndim != 2 or (existing_vectors.ndim == 2 and existing_vectors.shape[1] != info.dimension):
+                # 修正向量文件形狀
+                if existing_vectors.size == 0:
+                    all_vectors = np.empty((0, info.dimension), dtype=np.float32)
+                else:
+                    if existing_vectors.ndim == 1:
+                        all_vectors = existing_vectors.reshape(-1, info.dimension)
+                    else:
+                        all_vectors = existing_vectors
+                np.save(vectors_path, all_vectors)
+                logger.info(f"已修正向量文件形狀: {all_vectors.shape}")
             return info
         
         # 記錄新增的向量數量（在合併前）
