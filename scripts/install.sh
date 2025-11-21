@@ -1,49 +1,124 @@
 #!/bin/bash
 
-# DiskRAG 一鍵安裝腳本
+# DiskRAG 一鍵安裝腳本（使用 uv）
 
 set -e
 
 echo "╔══════════════════════════════════════╗"
-echo "║      DiskRAG 一鍵安裝腳本           ║"
+echo "║   DiskRAG 一鍵安裝腳本 (使用 uv)    ║"
 echo "╚══════════════════════════════════════╝"
 echo
 
-# 檢查 Python 版本
-echo "檢查 Python 版本..."
-if ! command -v python3 &> /dev/null; then
-    echo "錯誤: 未找到 Python 3"
-    echo "請先安裝 Python 3.8 或更新版本"
+# 檢查 uv 是否已安裝
+echo "檢查 uv 是否已安裝..."
+if ! command -v uv &> /dev/null; then
+    echo "⚠️  uv 未安裝，正在安裝..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    
+    # 重新載入 PATH
+    export PATH="$HOME/.cargo/bin:$PATH"
+    
+    # 如果還找不到，提示用戶
+    if ! command -v uv &> /dev/null; then
+        echo "❌ uv 安裝後仍無法找到，請重新開啟終端或執行："
+        echo "   source ~/.zshrc  # 或 source ~/.bash_profile"
+        echo "然後重新執行 make install"
+        exit 1
+    fi
+    echo "✅ uv 安裝完成"
+else
+    echo "✅ 找到 uv: $(uv --version)"
+fi
+
+# 使用 uv 建立虛擬環境（會自動安裝 Python 3.11 如果沒有）
+echo
+echo "使用 uv 建立虛擬環境（Python 3.11）..."
+if [ -d "venv" ] || [ -d ".venv" ]; then
+    echo "⚠️  虛擬環境已存在，清除並重新建立..."
+    rm -rf venv .venv
+fi
+
+# 使用 --clear 標誌自動清除，並指定目錄名為 venv
+uv venv --python 3.11 venv
+if [ $? -ne 0 ]; then
+    echo "❌ 建立虛擬環境失敗"
+    echo "請確認 uv 已正確安裝，或手動執行: uv venv --python 3.11 venv"
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-echo "找到 Python $PYTHON_VERSION"
+# 驗證虛擬環境是否正確建立
+if [ ! -d "venv" ] || [ ! -f "venv/bin/python" ]; then
+    echo "❌ 虛擬環境建立不完整"
+    exit 1
+fi
 
-# 建立虛擬環境
-echo
-echo "建立虛擬環境..."
-python3 -m venv venv
+echo "✅ 虛擬環境建立完成"
 
 # 啟用虛擬環境
 echo "啟用虛擬環境..."
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    # Windows
-    source venv/Scripts/activate
-else
-    # Unix-like
-    source venv/bin/activate
+source venv/bin/activate
+
+# 驗證 Python 是否可用
+if ! venv/bin/python --version >/dev/null 2>&1; then
+    echo "❌ 虛擬環境中的 Python 不可用"
+    exit 1
 fi
 
-# 升級 pip
+# 使用 uv 安裝依賴（速度更快）
+# 明確指定虛擬環境路徑，避免 uv 找不到
 echo
-echo "升級 pip..."
-pip install --upgrade pip
+echo "使用 uv 安裝依賴套件..."
+uv pip install --python venv/bin/python --upgrade pip setuptools wheel
 
-# 安裝依賴
+# 安裝 NumPy（確保正確安裝）
+echo "安裝 NumPy..."
+uv pip install --python venv/bin/python numpy || {
+    echo "⚠️  NumPy 安裝失敗，嘗試強制重新安裝..."
+    uv pip install --python venv/bin/python --force-reinstall --no-cache-dir numpy
+}
+
+# 驗證 NumPy 安裝
+if ! venv/bin/python -c "import numpy" 2>/dev/null; then
+    echo "❌ NumPy 安裝失敗，請檢查 Python 版本兼容性"
+    echo "建議使用 Python 3.11"
+    exit 1
+fi
+
+# 安裝其他依賴
+uv pip install --python venv/bin/python -r requirements.txt
+
+# 確保 pydantic 和 pydantic-core 正確安裝
 echo
-echo "安裝依賴套件..."
-pip install -r requirements.txt
+echo "驗證並修復 pydantic 安裝..."
+if ! venv/bin/python -c "import pydantic; from pydantic_core import __version__" 2>/dev/null; then
+    echo "⚠️  pydantic 或 pydantic-core 導入失敗，嘗試重新安裝..."
+    # 先卸載再重新安裝，確保乾淨安裝
+    uv pip uninstall --python venv/bin/python -y pydantic pydantic-core 2>/dev/null || true
+    uv pip install --python venv/bin/python --no-cache-dir pydantic-core
+    uv pip install --python venv/bin/python --no-cache-dir pydantic
+    
+    # 再次驗證
+    if ! venv/bin/python -c "import pydantic; from pydantic_core import __version__" 2>/dev/null; then
+        echo "⚠️  標準安裝失敗，嘗試強制重新安裝..."
+        uv pip install --python venv/bin/python --force-reinstall --no-cache-dir pydantic-core pydantic
+    fi
+fi
+
+# 最終驗證 pydantic 安裝
+if ! venv/bin/python -c "import pydantic; from pydantic_core import __version__" 2>/dev/null; then
+    echo "❌ pydantic 安裝失敗"
+    echo "建議使用 uv 重新建立虛擬環境："
+    echo "  rm -rf venv"
+    echo "  uv venv --python 3.11"
+    echo "  make install"
+    exit 1
+fi
+echo "✅ pydantic 安裝驗證通過"
+
+# 安裝 pydiskann
+echo
+echo "安裝 pydiskann..."
+uv pip install --python venv/bin/python -e pydiskann
 
 # 建立必要目錄
 echo
@@ -95,10 +170,37 @@ if [ ! -f "examples/faq_data.csv" ]; then
     cat > examples/faq_data.csv << 'EOF'
 id,question,answer,source_file,source_page,source_section,source_image
 faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
-faq_002,如何購買原裝配件？,應訪問 https://www.bosch-home.com/accessories/ 或聯繫當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
+faq_002,如何購買原裝配件？,應造訪 https://www.bosch-home.com/accessories/ 或聯絡當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
 faq_003,8歲以下的青少年可以使用嗎？,不可以，未滿 8 歲的青少年不得使用本機。,EBF7531SBA_ZH_Manual.pdf,3,安全資訊,images/safety.png
 faq_004,如何設定水質硬度？,在基本設定中，選擇「水質硬度」選項，並從等級 1 到 10 中選擇對應您所在地區的水質硬度。,EBF7531SBA_ZH_Manual.pdf,15,基本設定,images/water_hardness.png
 faq_005,洗碗機可以洗滌哪些物品？,可以洗滌：餐具、玻璃杯、碗盤、鍋具等。不可洗滌：木製餐具、鋁製鍋具、塑膠容器等。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/items.png
+faq_006,如何選擇適合的洗滌程式？,根據餐具的髒污程度和類型選擇對應的洗滌程式，例如：輕度髒污選擇快速洗滌，重度油污選擇強力洗滌。,EBF7531SBA_ZH_Manual.pdf,10,操作說明,images/programs.png
+faq_007,洗碗機需要多久清洗一次？,建議每個月至少清洗一次，使用專用清潔劑並執行清潔程式，以保持機器最佳效能。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/cleaning.png
+faq_008,如何正確擺放餐具？,將餐具擺放在專用籃子中，確保餐具之間有適當間距，避免重疊遮擋，以確保水流能充分沖洗。,EBF7531SBA_ZH_Manual.pdf,9,使用說明,images/loading.png
+faq_009,洗碗機使用時會很耗電嗎？,現代洗碗機設計節能，單次洗滌耗電量約 0.8-1.2 度，比手洗更節省水資源。,EBF7531SBA_ZH_Manual.pdf,11,節能資訊,images/energy.png
+faq_010,如何處理洗碗機異味？,定期清潔過濾網，使用專用清潔劑，並確保每次使用後保持門板微開通風。,EBF7531SBA_ZH_Manual.pdf,12,故障排除,images/odor.png
+faq_011,洗碗機可以洗不鏽鋼餐具嗎？,可以，不鏽鋼餐具是洗碗機最適合清洗的材質之一，但建議避免與其他金屬餐具直接接觸。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/stainless.png
+faq_012,如何延長洗碗機使用壽命？,定期保養、使用軟水、避免過度負載、及時清理過濾網，並按照說明書正確操作。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/maintenance.png
+faq_013,洗碗機的洗滌時間是多久？,根據選擇的程式不同，洗滌時間從 30 分鐘到 3 小時不等，快速程式約 30-60 分鐘。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/timing.png
+faq_014,如何判斷洗碗機是否需要維修？,如果出現異常噪音、無法啟動、洗滌不乾淨、漏水等問題，應聯繫專業維修人員檢查。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/troubleshooting.png
+faq_015,洗碗機可以洗嬰兒用品嗎？,可以，但建議使用高溫洗滌程式，並確保嬰兒用品材質適合高溫清洗，使用後徹底沖洗。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/baby.png
+faq_016,如何選擇適合的洗碗機清潔劑？,選擇專為洗碗機設計的清潔劑，避免使用一般洗潔精，以免產生過多泡沫影響洗滌效果。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/detergent.png
+faq_017,洗碗機的容量如何計算？,容量以標準餐具組數計算，一般家用洗碗機可容納 12-16 人份的標準餐具組。,EBF7531SBA_ZH_Manual.pdf,7,規格說明,images/capacity.png
+faq_018,如何處理洗碗機漏水問題？,檢查門封條是否損壞、過濾網是否正確安裝、進水管是否鬆動，如無法解決應聯繫維修。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/leak.png
+faq_019,洗碗機需要預先沖洗餐具嗎？,不需要，只需清除大塊食物殘渣即可，現代洗碗機設計可處理一般程度的髒污。,EBF7531SBA_ZH_Manual.pdf,9,使用說明,images/prewash.png
+faq_020,如何設定洗碗機的烘乾功能？,在洗滌程式結束後，可選擇烘乾程式或使用餘熱烘乾，部分機型支援自動烘乾設定。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/drying.png
+faq_021,洗碗機可以洗玻璃器皿嗎？,可以，玻璃器皿是洗碗機最適合清洗的材質之一，建議使用溫和洗滌程式並正確擺放。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/glass.png
+faq_022,如何處理洗碗機的噪音問題？,正常運作時會有水流聲，如果出現異常噪音可能是過濾網堵塞或噴臂故障，應檢查並清理。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/noise.png
+faq_023,洗碗機的耗水量是多少？,單次洗滌耗水量約 10-15 公升，比手洗更節省水資源，且使用循環水系統提高效率。,EBF7531SBA_ZH_Manual.pdf,11,節能資訊,images/water.png
+faq_024,如何保養洗碗機的門封條？,定期用軟布擦拭門封條，保持清潔乾燥，避免使用強力清潔劑，如有損壞應及時更換。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/seal.png
+faq_025,洗碗機可以洗陶瓷餐具嗎？,可以，陶瓷餐具完全適合洗碗機清洗，建議使用標準洗滌程式即可。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/ceramic.png
+faq_026,如何處理洗碗機無法啟動的問題？,檢查電源連接、門是否關緊、水龍頭是否開啟、過濾網是否堵塞，如無法解決應聯繫維修。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/startup.png
+faq_027,洗碗機的洗滌溫度是多少？,根據選擇的程式不同，洗滌溫度從 30°C 到 70°C 不等，高溫程式可有效殺菌。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/temperature.png
+faq_028,如何選擇適合的洗碗機鹽？,選擇專為洗碗機設計的軟化鹽，定期檢查鹽倉是否需要補充，以保護機器並提高洗滌效果。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/salt.png
+faq_029,洗碗機可以洗塑膠容器嗎？,部分塑膠容器可以，但需確認容器標示是否適合洗碗機清洗，避免高溫變形或釋放有害物質。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/plastic.png
+faq_030,如何處理洗碗機洗不乾淨的問題？,檢查清潔劑是否足夠、水質硬度設定是否正確、過濾網是否堵塞、噴臂是否正常運轉。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/cleaning_issue.png
+faq_031,洗碗機的烘乾方式有哪些？,包括餘熱烘乾、強制烘乾、自動開門烘乾等，不同機型支援的烘乾方式可能不同。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/dry_methods.png
+faq_032,如何延長洗碗機過濾網的使用壽命？,每次使用後清理過濾網，避免食物殘渣堆積，定期用軟刷清洗，如有損壞應及時更換。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/filter.png
 EOF
 fi
 
@@ -107,245 +209,34 @@ if [ ! -f "data/example.csv" ]; then
     echo "建立範例檔案..."
     cat > data/example.csv << 'EOF'
 question,answer
-什麼是 DiskANN？,DiskANN 是一個可擴展的近似最近鄰搜索算法，專門設計用於處理大規模向量數據集，特別是當數據集大小超過記憶體容量時。
-DiskANN 解決了什麼問題？,DiskANN 解決了大規模向量搜索中的記憶體限制問題，允許在磁碟上建立和查詢十億級別的向量索引，同時保持高精度和高效能。
-DiskANN 的核心原理是什麼？,DiskANN 結合了圖形導航搜索和分層索引結構，將熱點數據保存在記憶體中，冷數據存儲在磁碟上，通過智能的數據分層來優化查詢效能。
+什麼是 DiskANN？,DiskANN 是一個可擴展的近似最近鄰搜尋演算法，專門設計用於處理大規模向量資料集，特別是當資料集大小超過記憶體容量時。
+DiskANN 解決了什麼問題？,DiskANN 解決了大規模向量搜尋中的記憶體限制問題，允許在磁碟上建立和查詢十億級別的向量索引，同時保持高精度和高效能。
+DiskANN 的核心原理是什麼？,DiskANN 結合了圖形導航搜尋和分層索引結構，將熱點資料保存在記憶體中，冷資料儲存在磁碟上，透過智能的資料分層來優化查詢效能。
 什麼是 Vamana 圖？,Vamana 是 DiskANN 使用的圖形結構，它是一個度數受限的圖，每個節點的鄰居數量有上限，這樣可以控制記憶體使用量並提高搜索效率。
-DiskANN 相比於其他 ANN 算法有什麼優勢？,DiskANN 的主要優勢包括：1) 可處理超大規模數據集 2) 記憶體使用量可控 3) 查詢延遲穩定 4) 支援動態更新 5) 在精度和效能間有良好平衡。
+DiskANN 相比於其他 ANN 演算法有什麼優勢？,DiskANN 的主要優勢包括：1) 可處理超大規模資料集 2) 記憶體使用量可控 3) 查詢延遲穩定 4) 支援動態更新 5) 在精度和效能間有良好平衡。
 DiskANN 如何處理記憶體不足的問題？,DiskANN 使用分層架構，將經常訪問的節點和邊緩存在記憶體中，較少訪問的數據存儲在磁碟上，通過預取和緩存策略來減少磁碟 I/O。
 EOF
 fi
 
-# 建立 .env 範例檔案
-if [ ! -f ".env.example" ]; then
-    echo "建立 .env 範例檔案..."
-    cat > .env.example << 'EOF'
-# DiskRAG 環境變數範例
-# 請複製此檔案為 .env 並填入您的 API 金鑰
-
-# OpenAI API 金鑰 (必需)
-OPENAI_API_KEY=your-openai-api-key-here
-
-# 可選：Vertex AI 專案 ID (如果使用 Google Cloud)
-# VERTEX_PROJECT_ID=your-vertex-project-id
-EOF
-fi
-
-# 建立 README 檔案
-if [ ! -f "README_QUICKSTART.md" ]; then
-    echo "建立快速開始指南..."
-    cat > README_QUICKSTART.md << 'EOF'
-# DiskRAG 快速開始指南
-
-## 🚀 5分鐘快速開始
-
-### 1. 環境設置 (已完成)
-✅ 虛擬環境已建立
-✅ 依賴套件已安裝
-✅ 目錄結構已建立
-✅ 設定檔已建立
-
-### 2. 設定 API 金鑰
-```bash
-# 複製環境變數範例
-cp .env.example .env
-
-# 編輯 .env 文件，填入您的 OpenAI API 金鑰
-# OPENAI_API_KEY=your-api-key-here
-```
-
-### 3. 使用 FAQ 工作流程 (推薦)
-
-#### 準備 FAQ 數據
-```bash
-# 使用範例 FAQ 文件
-./scripts/process_faq.sh my_manual examples/faq_data.csv
-
-# 或使用自己的 CSV 文件
-./scripts/process_faq.sh my_collection data/my_faq.csv
-```
-
-#### 搜索測試
-```bash
-# 測試搜索
-./scripts/search_faq.sh my_manual "EBF7531SBA 這台機器怎麼用？"
-```
-
-#### 啟動 API 服務
-```bash
-# 啟動 FastAPI 服務
-./scripts/run_api.sh
-```
-
-### 4. 傳統工作流程
-
-#### 處理文件
-```bash
-# 處理 FAQ 文件
-python diskrag.py process data/example.csv --collection faq
-
-# 處理 Markdown 文件
-python diskrag.py process data/manual.md --collection manual
-```
-
-#### 建立索引
-```bash
-python diskrag.py index faq
-```
-
-#### 搜索
-```bash
-python diskrag.py search faq "DiskANN 解決了什麼問題?"
-```
-
-## 📁 目錄結構
-
-```
-diskrag/
-├── data/                    # 數據文件
-│   └── example.csv         # 範例文件
-├── examples/               # 範例文件
-│   └── faq_data.csv       # FAQ 範例
-├── collections/            # 向量集合
-├── logs/                   # 日誌文件
-├── scripts/                # 腳本文件
-│   ├── install.sh         # 安裝腳本
-│   ├── process_faq.sh     # FAQ 處理腳本
-│   ├── search_faq.sh      # FAQ 搜索腳本
-│   └── run_api.sh         # API 服務腳本
-├── config.yaml            # 設定檔
-├── .env.example           # 環境變數範例
-└── README_QUICKSTART.md   # 本文件
-```
-
-## 🔧 常用命令
-
-### FAQ 工作流程 (推薦)
-```bash
-# 處理 FAQ 文件
-./scripts/process_faq.sh <collection_name> <csv_file>
-
-# 搜索 FAQ
-./scripts/search_faq.sh <collection_name> <query>
-
-# 啟動 API 服務
-./scripts/run_api.sh
-```
-
-### 傳統工作流程
-```bash
-# 處理文件
-python diskrag.py process <file> --collection <name>
-
-# 建立索引
-python diskrag.py index <collection_name>
-
-# 搜索
-python diskrag.py search <collection_name> <query>
-
-# 列出所有 collections
-python diskrag.py list
-```
-
-## 📊 FAQ CSV 格式
-
-```csv
-id,question,answer,source_file,source_page,source_section,source_image
-faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
-faq_002,如何購買原裝配件？,應訪問 https://www.bosch-home.com/accessories/ 或聯繫當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
-```
-
-## 🌐 API 使用
-
-### 啟動服務
-```bash
-./scripts/run_api.sh
-```
-
-### API 端點
-- **FAQ 搜索**: `POST /faq-search`
-- **普通搜索**: `POST /search`
-- **健康檢查**: `GET /health`
-- **Collections**: `GET /collections`
-
-### 使用示例
-```bash
-# FAQ 搜索
-curl -X POST 'http://localhost:8000/faq-search' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "collection": "my_manual",
-    "query": "EBF7531SBA 這台機器怎麼用？",
-    "top_k": 5
-  }'
-```
-
-## 🆘 故障排除
-
-### 常見問題
-
-1. **環境變數未設置**
-   ```bash
-   # 設置環境變數
-   export OPENAI_API_KEY='your-api-key'
-   ```
-
-2. **虛擬環境未激活**
-   ```bash
-   # 激活虛擬環境
-   source venv/bin/activate  # Linux/macOS
-   source venv/Scripts/activate  # Windows
-   ```
-
-3. **Docker 未安裝**
-   - 安裝 Docker: https://docs.docker.com/get-docker/
-   - 安裝 Docker Compose: https://docs.docker.com/compose/install/
-
-### 獲取幫助
-- 查看完整文檔: `README.md`
-- 查看工作流程文檔: `docs/FAQ_WORKFLOW.md`
-- 運行測試: `python scripts/test_faq_workflow.py`
-EOF
-fi
-
-# 建立快捷命令
-echo
-echo "建立快捷命令..."
-cat > diskrag << 'EOF'
-#!/bin/bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$DIR/venv/bin/activate" 2>/dev/null || source "$DIR/venv/Scripts/activate" 2>/dev/null
-python "$DIR/diskrag.py" "$@"
-EOF
-chmod +x diskrag
-
-# 檢查 OPENAI_API_KEY
-echo
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "⚠️  注意: 未設定 OPENAI_API_KEY"
-    echo
-    echo "請設定環境變數:"
-    echo "export OPENAI_API_KEY='your-api-key'"
-    echo
-    echo "或建立 .env 檔案:"
-    echo "echo \"OPENAI_API_KEY=your-api-key\" > .env"
-else
-    echo "✓ 已設定 OPENAI_API_KEY"
-fi
-
-# 完成訊息
 echo
 echo "╔══════════════════════════════════════╗"
-echo "║         安裝完成！                   ║"
+echo "║          ✅ 安裝完成！                ║"
 echo "╚══════════════════════════════════════╝"
 echo
-echo "使用方式:"
-echo "  ./diskrag process data/example.csv --collection example"
-echo "  ./diskrag index example"
-echo "  ./diskrag search example '什麼是 DiskRAG'"
-echo
-echo "或啟用虛擬環境後使用:"
-echo "  source venv/bin/activate  # Unix/Linux/macOS"
-echo "  venv\\Scripts\\activate     # Windows"
-echo "  python diskrag.py --help"
-echo
+echo "📋 下一步："
+echo "  1. 設定 OpenAI API Key:"
+echo "     echo 'OPENAI_API_KEY=your-api-key' > .env"
+echo "     或"
+echo "     export OPENAI_API_KEY='your-api-key'"
+echo ""
+echo "  2. 快速體驗："
+echo "     make demo"
+echo ""
+echo "  3. 查看完整文檔："
+echo "     cat README.md"
+echo ""
+echo "💡 提示："
+echo "  - 使用 'make help' 查看所有可用命令"
+echo "  - 使用 'diskrag list' 查看所有 collections"
+echo "  - 使用 'diskrag search <collection> <query>' 進行搜尋"
+echo ""
