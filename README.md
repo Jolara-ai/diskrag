@@ -281,12 +281,8 @@ diskrag index my_collection --target-quality high
 詳細配置說明請參考 [configs/README.md](configs/README.md)
 
 
-
-## 更多資源
-
-- [FAQ 工作流程](docs/FAQ_WORKFLOW.md) - FAQ 處理完整流程
 - [配置說明](configs/README.md) - 詳細的配置選項
-- [腳本使用說明](scripts/USAGE.md) - 所有腳本的使用方法
+
 
 ## 常見問題
 
