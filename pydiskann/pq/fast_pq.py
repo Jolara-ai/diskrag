@@ -1,6 +1,163 @@
 import numpy as np
 from sklearn.cluster import KMeans
-from typing import Tuple, List, Optional
+import numba as nb
+
+@nb.njit(fastmath=True, cache=True)
+def _compute_subvector_distances(sub_vectors, centroids):
+    """計算子向量到其對應質心的距離"""
+    n_subvectors, sub_dim = sub_vectors.shape
+    n_centroids, _ = centroids.shape
+    distances = np.empty((n_subvectors, n_centroids), dtype=np.float32)
+    for i in range(n_subvectors):
+        for j in range(n_centroids):
+            distances[i, j] = np.sum(np.square(sub_vectors[i] - centroids[j]))
+    return distances
+
+class DiskANNPQ:
+    def __init__(self, n_subvectors, n_centroids):
+        self.n_subvectors = n_subvectors
+        self.n_centroids = n_centroids
+        self.sub_dim = None
+        self.kmeans_list = []
+        self.is_fitted = False
+        self.means_ = None  # 用於標準化
+        self.stds_ = None   # 用於標準化
+        self.epsilon = 1e-8 # 避免除以零
+
+    def fit(self, data: np.ndarray):
+        """
+        訓練 PQ 模型
+        Args:
+            data: 訓練數據，形狀為 (n_samples, n_features)
+        """
+        n_samples, n_features = data.shape
+        if n_features % self.n_subvectors != 0:
+            raise ValueError("特徵維度必須能被子向量數量整除")
+        
+        self.sub_dim = n_features // self.n_subvectors
+        self.kmeans_list = []
+        
+        # 計算並應用標準化參數
+        self.means_ = np.mean(data, axis=0)
+        self.stds_ = np.std(data, axis=0)
+        normalized_data = (data - self.means_) / (self.stds_ + self.epsilon)
+
+        for i in range(self.n_subvectors):
+            sub_data = normalized_data[:, i * self.sub_dim : (i + 1) * self.sub_dim]
+            kmeans = KMeans(n_clusters=self.n_centroids, random_state=0, n_init=10, verbose=False)
+            kmeans.fit(sub_data)
+            self.kmeans_list.append(kmeans)
+        
+        self.is_fitted = True
+
+    @nb.njit(fastmath=True, cache=True)
+    def encode(self, data: np.ndarray) -> np.ndarray:
+        """
+        將數據編碼為 PQ 編碼
+        Args:
+            data: 待編碼數據，形狀為 (n_samples, n_features)
+        Returns:
+            PQ 編碼，形狀為 (n_samples, n_subvectors)
+        """
+        if not self.is_fitted:
+            raise ValueError("模型未訓練，請先調用 fit 方法")
+        
+        n_samples, n_features = data.shape
+        pq_codes = np.empty((n_samples, self.n_subvectors), dtype=np.uint8)
+        
+        # 應用標準化
+        normalized_data = (data - self.means_) / (self.stds_ + self.epsilon)
+
+        for i in range(self.n_subvectors):
+            sub_data = normalized_data[:, i * self.sub_dim : (i + 1) * self.sub_dim]
+            centroids = self.kmeans_list[i].cluster_centers_
+            
+            for j in range(n_samples):
+                # 計算子向量到所有質心的距離
+                distances = np.sum(np.square(sub_data[j] - centroids), axis=1)
+                pq_codes[j, i] = np.argmin(distances)
+                
+        return pq_codes
+
+    @nb.njit(fastmath=True, cache=True)
+    def compute_distance_table(self, query_vector: np.ndarray) -> np.ndarray:
+        """
+        計算查詢向量的非對稱距離表 (ADC)
+        Args:
+            query_vector: 查詢向量，形狀為 (n_features,)
+        Returns:
+            距離表，形狀為 (n_subvectors, n_centroids)
+        """
+        if not self.is_fitted:
+            raise ValueError("模型未訓練，請先調用 fit 方法")
+        
+        # 應用標準化
+        normalized_query = (query_vector - self.means_) / (self.stds_ + self.epsilon)
+
+        distance_table = np.empty((self.n_subvectors, self.n_centroids), dtype=np.float32)
+        for i in range(self.n_subvectors):
+            sub_query = normalized_query[i * self.sub_dim : (i + 1) * self.sub_dim]
+            centroids = self.kmeans_list[i].cluster_centers_
+            
+            # 計算子查詢向量到所有質心的距離
+            for j in range(self.n_centroids):
+                distance_table[i, j] = np.sum(np.square(sub_query - centroids[j]))
+                
+        return distance_table
+
+    @nb.njit(fastmath=True, cache=True)
+    def asymmetric_distance_sq(self, pq_codes: np.ndarray, distance_table: np.ndarray) -> np.ndarray:
+        """
+        使用非對稱距離表計算平方距離
+        Args:
+            pq_codes: PQ 編碼，形狀為 (n_samples, n_subvectors)
+            distance_table: 距離表，形狀為 (n_subvectors, n_centroids)
+        Returns:
+            近似平方距離，形狀為 (n_samples,)
+        """
+        n_samples, n_subvectors = pq_codes.shape
+        approx_distances_sq = np.zeros(n_samples, dtype=np.float32)
+        
+        for i in range(n_samples):
+            for j in range(n_subvectors):
+                approx_distances_sq[i] += distance_table[j, pq_codes[i, j]]
+                
+        return approx_distances_sq
+
+    def asymmetric_distance(self, pq_codes: np.ndarray, distance_table: np.ndarray) -> np.ndarray:
+        """
+        計算非對稱距離（開根號）
+        """
+        return np.sqrt(self.asymmetric_distance_sq(pq_codes, distance_table))
+
+    def get_memory_usage(self):
+        """
+        獲取 PQ 模型的記憶體使用情況和壓縮比
+        """
+        if not self.is_fitted:
+            return {"error": "模型未訓練"}
+        
+        # 原始數據維度 (假設 float32)
+        original_dim = self.n_subvectors * self.sub_dim
+        
+        # 碼本記憶體 (float32)
+        codebook_memory = sum(kmeans.cluster_centers_.nbytes for kmeans in self.kmeans_list)
+        
+        # PQ 編碼記憶體 (uint8)
+        # 每個向量的 PQ 編碼大小為 n_subvectors * 1 字節
+        
+        # 假設原始向量是 float32
+        original_vector_size = original_dim * 4 # 字節
+        pq_code_size = self.n_subvectors * 1 # 字節
+        
+        compression_ratio = original_vector_size / pq_code_size if pq_code_size > 0 else 0
+        
+        return {
+            "codebook_memory_bytes": codebook_memory,
+            "pq_code_size_per_vector_bytes": pq_code_size,
+            "original_vector_size_bytes": original_vector_size,
+            "compression_ratio": compression_ratio
+        }
 
 class DiskANNPQ:
     """

@@ -97,11 +97,8 @@ class DiskRAG:
         elif input_file.suffix.lower() in ['.md', '.markdown']:
             logger.info(f"處理 Markdown 檔案: {input_file}")
             self._process_document(input_file, config, 'md')
-        elif input_file.suffix.lower() in ['.docx', '.doc']:
-            logger.info(f"處理 Word 檔案: {input_file}")
-            self._process_document(input_file, config, 'docx')
         else:
-            raise ValueError(f"不支援的檔案類型: {input_file.suffix}")
+            raise ValueError(f"不支援的檔案類型: {input_file.suffix}。目前支援: .csv, .md, .markdown")
             
     def _process_csv(self, input_file: Path, config: PreprocessingConfig, 
                      generate_questions: bool) -> None:
@@ -118,10 +115,7 @@ class DiskRAG:
             manual_dir=str(input_file.parent),
             config_path=str(self.config_path)
         )
-        if doc_type == 'md':
-            chunks = processor.process_markdown(input_file)
-        else: # docx
-            chunks = processor.process_docx(input_file)
+        chunks = processor.process_markdown(input_file)
         
         if chunks:
             self._save_chunks(chunks, processor, config, input_file)
@@ -237,7 +231,7 @@ class DiskRAG:
         if not dir_path.exists():
             raise ValueError(f"目錄不存在: {directory}")
             
-        supported_extensions = {'.csv', '.md', '.markdown', '.docx', '.doc'}
+        supported_extensions = {'.csv', '.md', '.markdown'}
         
         # 收集檔案
         if recursive:
@@ -313,14 +307,14 @@ class DiskRAG:
                 continue
                 
             vectors_path = self.manager.get_vectors_path(collection)
-            texts_path = self.manager.get_texts_path(collection)
+            metadata_path = self.manager.get_metadata_path(collection)
             
-            if not vectors_path.exists() or not texts_path.exists():
+            if not vectors_path.exists() or not metadata_path.exists():
                 logger.warning(f"collection {collection} 的數據文件不存在")
                 continue
                 
             vectors = np.load(str(vectors_path))
-            texts_df = pl.read_parquet(str(texts_path))
+            texts_df = pl.read_parquet(str(metadata_path))
             
             all_vectors.append(vectors)
             all_texts.append(texts_df)
@@ -347,7 +341,9 @@ class DiskRAG:
         
         # 保存合併的數據
         self.manager.save_vectors(target_collection, merged_vectors)
-        self.manager.save_texts(target_collection, merged_texts)
+        # 保存合併的元數據
+        metadata_path = self.manager.get_metadata_path(target_collection)
+        merged_texts.write_parquet(str(metadata_path))
         
         logger.info(f"成功合併到 {target_collection}: {len(merged_vectors)} 個向量")
 
@@ -457,7 +453,7 @@ def main():
 
     # --- Process Command ---
     process_parser = subparsers.add_parser('process', help='處理來源檔案並生成向量')
-    process_parser.add_argument('file', help='要處理的檔案路徑 (.csv, .md, .docx)')
+    process_parser.add_argument('file', help='要處理的檔案路徑 (.csv, .md, .markdown)')
     process_parser.add_argument('--collection', '-c', help='指定 collection 名稱 (預設: 從檔名或設定檔中獲取)')
     process_parser.add_argument('--questions', '-q', action='store_true', help='為 FAQ (CSV) 生成相似問題')
 
@@ -527,10 +523,61 @@ def main():
             for i, result in enumerate(results, 1):
                 similarity = 1 - result['distance'] # 假設距離是 0-2 之間
                 print(f"[{i}] 相似度: {similarity:.2%}")
-                text_preview = result['text'].replace('\n', ' ').strip()
-                print(f"    內容: {text_preview[:150]}...")
-                if result.get('metadata'):
-                    source = result['metadata'].get('manual') or result['metadata'].get('source_type')
+                
+                # 檢查是否為 FAQ 類型，如果是則顯示答案
+                metadata = result.get('metadata', {})
+                if isinstance(metadata, str):
+                    try:
+                        import json
+                        metadata = json.loads(metadata)
+                    except:
+                        metadata = {}
+                
+                # 檢查是否為 FAQ（支援嵌套 metadata）
+                is_faq = False
+                answer = None
+                question = None
+                
+                # 方法1: 檢查頂層是否有 answer 欄位（FAQ 的標誌）
+                if metadata.get('answer'):
+                    is_faq = True
+                    answer = metadata.get('answer')
+                    question = metadata.get('original_question') or result.get('text', '')
+                # 方法2: 檢查頂層的 type
+                elif metadata.get('type') == 'faq':
+                    is_faq = True
+                    answer = metadata.get('answer')
+                    question = metadata.get('original_question') or result.get('text', '')
+                # 方法3: 檢查是否有嵌套的 metadata（從 parquet 讀取時可能是字串）
+                else:
+                    nested_meta_str = metadata.get('metadata')
+                    if nested_meta_str:
+                        if isinstance(nested_meta_str, str):
+                            try:
+                                nested_meta = json.loads(nested_meta_str)
+                            except:
+                                nested_meta = {}
+                        else:
+                            nested_meta = nested_meta_str
+                        
+                        if isinstance(nested_meta, dict) and nested_meta.get('type') == 'faq':
+                            is_faq = True
+                            # 答案在頂層，問題可能在頂層或嵌套層
+                            answer = metadata.get('answer')
+                            question = metadata.get('original_question') or nested_meta.get('original_question') or result.get('text', '')
+                
+                if is_faq and answer:
+                    # FAQ 搜尋結果：顯示答案
+                    print(f"    問題: {question}")
+                    print(f"    答案: {answer}")
+                else:
+                    # 一般搜尋結果：顯示文字內容
+                    text_content = result['text'].strip()
+                    print(f"    內容: {text_content}")
+                
+                # 顯示來源資訊
+                if metadata:
+                    source = metadata.get('manual') or metadata.get('source_type') or metadata.get('source_file')
                     if source:
                         print(f"    來源: {source}")
             print("-" * 80)
