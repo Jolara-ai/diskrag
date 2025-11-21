@@ -2,13 +2,12 @@
 
 基於 DiskANN 的向量搜尋系統，用於建立知識庫並進行搜尋。
 
-> ⚠️ **重要**: 如果系統上沒有 Python 3.11，請使用 uv 安裝：
 > 
 > ```bash
 > # 安裝 uv
 > curl -LsSf https://astral.sh/uv/install.sh | sh
 > 
-> # 使用 uv 安裝 Python 3.11 並建立虛擬環境（一步完成）
+> # 使用 uv 安裝 Python 3.11 並建立虛擬環境
 > uv venv --python 3.11
 > ```
 
@@ -68,15 +67,13 @@ diskrag search my_collection "你的問題"
 
 ### 系統需求
 
-- Python 3.11（推薦，與所有依賴套件兼容性最佳）
+- Python 3.11
 - pip
 - OpenAI API 金鑰
 
 ### 安裝 Python 3.11
 
 如果系統上沒有 Python 3.11，請使用 `uv` 安裝：
-
-`uv` 是一個極快的 Python 包管理工具，可以同時管理 Python 版本、虛擬環境和依賴。
 
 ```bash
 # 1. 安裝 uv
@@ -85,15 +82,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. 重新載入 shell（或重新開啟終端）
 source ~/.zshrc  # 或 source ~/.bash_profile
 
-# 3. 使用 uv 安裝 Python 3.11 並建立虛擬環境（一步完成）
+# 3. 使用 uv 安裝 Python 3.11 並建立虛擬環境
 uv venv --python 3.11
 ```
 
-**優點**：
-- ⚡ 速度極快（比 pip 快 10-100 倍）
-- 🎯 一步完成 Python 安裝和虛擬環境建立
-- 📦 自動管理依賴
-- 🔧 也可以直接用 `uv pip install` 替代 `pip install`
 
 ### 使用 Makefile
 
@@ -108,7 +100,7 @@ chmod +x scripts/*.sh
 ./scripts/install.sh
 ```
 
-> 💡 **Python 版本建議**: 強烈建議使用 Python 3.11，可避免所有依賴套件的兼容性問題
+> 💡 **Python 版本建議**: 建議使用 Python 3.11，可避免所有依賴套件的兼容性問題
 
 ## 設定
 
@@ -303,12 +295,6 @@ A: 造訪 [OpenAI Platform](https://platform.openai.com/api-keys) 建立 API 金
 
 **Q: 支援哪些檔案格式？**  
 A: CSV (FAQ/文章格式)、Markdown (.md, .markdown)
-
-**Q: 如何提高搜尋準確度？**  
-A: 使用 `diskrag index my_collection --target-quality high` 建立高品質索引
-
-**Q: 可以處理多大規模的資料？**  
-A: 基於 DiskANN，可以處理百萬級別的向量資料
 
 ## 許可證
 
