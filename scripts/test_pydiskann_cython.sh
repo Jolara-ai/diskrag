@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # 環境設定
-PROJECT_ROOT="/Users/haruki/diskrag"
-VENV_DIR="$PROJECT_ROOT/.venv"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV_DIR="$PROJECT_ROOT/venv"
 PYTHON_BIN="python3"
 
 echo "[1/7] 建立/啟用 venv: $VENV_DIR"
