@@ -101,11 +101,15 @@ def build_index(
         logger.warning(f"⚠️  轉換向量數據類型從 {vectors.dtype} 到 float32")
         vectors = vectors.astype(np.float32)
     
-    min_samples_needed = 16 # KMeans 需要至少這麼多樣本
-    if len(vectors) < min_samples_needed:
-        raise ValueError(f"向量數量({len(vectors)})不足，至少需要 {min_samples_needed} 個向量才能建立索引")
-
     n_points, dimension = vectors.shape
+    
+    # 檢查最小向量數要求（KMeans 需要至少 16 個樣本才能訓練 PQ）
+    min_samples_needed = 16
+    if n_points < min_samples_needed:
+        raise ValueError(f"向量數量({n_points})不足，至少需要 {min_samples_needed} 個向量才能建立索引（PQ 訓練需要）")
+    
+    # 始終使用 PQ（因為資料量已足夠）
+    use_pq = True
     logger.info(f"載入向量數據: {vectors.shape}, dtype: {vectors.dtype}")
     
     # 🔥 關鍵修復 2: 記錄向量統計信息用於後續驗證
@@ -152,12 +156,13 @@ def build_index(
     pq_params = calculate_adaptive_pq_params(n_points, dimension, target_accuracy)
     adaptive_pq_m = pq_params["n_subvectors"]
     
-    # 🔥 關鍵修復 3: 處理小數據集的情況
-    use_pq = True
-    if pq_params["recommendation"] == "brute_force" or n_points < 256:
-        logger.warning(f"⚠️  數據量過小({n_points}點 < 256)，將使用暴力搜索模式")
+    # 🔥 關鍵修復 3: 處理小數據集的情況（但始終使用 PQ，因為資料量已足夠）
+    # 注意：由於已經確保 n_points >= 16，所以始終使用 PQ
+    if pq_params["recommendation"] == "brute_force" and n_points >= 256:
+        logger.warning(f"⚠️  根據 PQ 推薦，將使用暴力搜索模式")
         use_pq = False
         adaptive_pq_m = 8  # 使用最小配置作為fallback
+    # 對於小數據集（16-255 點），仍然使用 PQ（因為已經通過最小數量檢查）
     
     logger.info(f"🎯 PQ 參數: {adaptive_pq_m}×256 (數據規模: {n_points}, 維度: {dimension})")
     logger.info(f"🎯 使用 PQ: {use_pq}")
