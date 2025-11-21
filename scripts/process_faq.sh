@@ -120,6 +120,7 @@ echo "✅ FAQ 檔案處理完成"
 
 # 建立索引
 echo "步驟2: 建立索引..."
+echo "   (正在構建 Vamana 圖與訓練 PQ 模型，這可能需要一些時間，請耐心等待...)"
 if command -v diskrag >/dev/null 2>&1; then
     # 檢查索引是否已存在
     if diskrag list | grep -q "^$COLLECTION_NAME"; then
