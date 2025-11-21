@@ -1,6 +1,33 @@
 id,question,answer,source_file,source_page,source_section,source_image
 faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
-faq_002,如何購買原裝配件？,應訪問 https://www.bosch-home.com/accessories/ 或聯繫當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
+faq_002,如何購買原裝配件？,應造訪 https://www.example.com/accessories/ 或聯絡當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
 faq_003,8歲以下的青少年可以使用嗎？,不可以，未滿 8 歲的青少年不得使用本機。,EBF7531SBA_ZH_Manual.pdf,3,安全資訊,images/safety.png
 faq_004,如何設定水質硬度？,在基本設定中，選擇「水質硬度」選項，並從等級 1 到 10 中選擇對應您所在地區的水質硬度。,EBF7531SBA_ZH_Manual.pdf,15,基本設定,images/water_hardness.png
-faq_005,洗碗機可以洗滌哪些物品？,可以洗滌：餐具、玻璃杯、碗盤、鍋具等。不可洗滌：木製餐具、鋁製鍋具、塑膠容器等。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/items.png 
+faq_005,洗碗機可以洗滌哪些物品？,可以洗滌：餐具、玻璃杯、碗盤、鍋具等。不可洗滌：木製餐具、鋁製鍋具、塑膠容器等。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/items.png
+faq_006,如何選擇適合的洗滌程式？,根據餐具的髒污程度和類型選擇對應的洗滌程式，例如：輕度髒污選擇快速洗滌，重度油污選擇強力洗滌。,EBF7531SBA_ZH_Manual.pdf,10,操作說明,images/programs.png
+faq_007,洗碗機需要多久清洗一次？,建議每個月至少清洗一次，使用專用清潔劑並執行清潔程式，以保持機器最佳效能。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/cleaning.png
+faq_008,如何正確擺放餐具？,將餐具擺放在專用籃子中，確保餐具之間有適當間距，避免重疊遮擋，以確保水流能充分沖洗。,EBF7531SBA_ZH_Manual.pdf,9,使用說明,images/loading.png
+faq_009,洗碗機使用時會很耗電嗎？,現代洗碗機設計節能，單次洗滌耗電量約 0.8-1.2 度，比手洗更節省水資源。,EBF7531SBA_ZH_Manual.pdf,11,節能資訊,images/energy.png
+faq_010,如何處理洗碗機異味？,定期清潔過濾網，使用專用清潔劑，並確保每次使用後保持門板微開通風。,EBF7531SBA_ZH_Manual.pdf,12,故障排除,images/odor.png
+faq_011,洗碗機可以洗不鏽鋼餐具嗎？,可以，不鏽鋼餐具是洗碗機最適合清洗的材質之一，但建議避免與其他金屬餐具直接接觸。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/stainless.png
+faq_012,如何延長洗碗機使用壽命？,定期保養、使用軟水、避免過度負載、及時清理過濾網，並按照說明書正確操作。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/maintenance.png
+faq_013,洗碗機的洗滌時間是多久？,根據選擇的程式不同，洗滌時間從 30 分鐘到 3 小時不等，快速程式約 30-60 分鐘。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/timing.png
+faq_014,如何判斷洗碗機是否需要維修？,如果出現異常噪音、無法啟動、洗滌不乾淨、漏水等問題，應聯繫專業維修人員檢查。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/troubleshooting.png
+faq_015,洗碗機可以洗嬰兒用品嗎？,可以，但建議使用高溫洗滌程式，並確保嬰兒用品材質適合高溫清洗，使用後徹底沖洗。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/baby.png
+faq_016,如何選擇適合的洗碗機清潔劑？,選擇專為洗碗機設計的清潔劑，避免使用一般洗潔精，以免產生過多泡沫影響洗滌效果。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/detergent.png
+faq_017,洗碗機的容量如何計算？,容量以標準餐具組數計算，一般家用洗碗機可容納 12-16 人份的標準餐具組。,EBF7531SBA_ZH_Manual.pdf,7,規格說明,images/capacity.png
+faq_018,如何處理洗碗機漏水問題？,檢查門封條是否損壞、過濾網是否正確安裝、進水管是否鬆動，如無法解決應聯繫維修。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/leak.png
+faq_019,洗碗機需要預先沖洗餐具嗎？,不需要，只需清除大塊食物殘渣即可，現代洗碗機設計可處理一般程度的髒污。,EBF7531SBA_ZH_Manual.pdf,9,使用說明,images/prewash.png
+faq_020,如何設定洗碗機的烘乾功能？,在洗滌程式結束後，可選擇烘乾程式或使用餘熱烘乾，部分機型支援自動烘乾設定。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/drying.png
+faq_021,洗碗機可以洗玻璃器皿嗎？,可以，玻璃器皿是洗碗機最適合清洗的材質之一，建議使用溫和洗滌程式並正確擺放。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/glass.png
+faq_022,如何處理洗碗機的噪音問題？,正常運作時會有水流聲，如果出現異常噪音可能是過濾網堵塞或噴臂故障，應檢查並清理。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/noise.png
+faq_023,洗碗機的耗水量是多少？,單次洗滌耗水量約 10-15 公升，比手洗更節省水資源，且使用循環水系統提高效率。,EBF7531SBA_ZH_Manual.pdf,11,節能資訊,images/water.png
+faq_024,如何保養洗碗機的門封條？,定期用軟布擦拭門封條，保持清潔乾燥，避免使用強力清潔劑，如有損壞應及時更換。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/seal.png
+faq_025,洗碗機可以洗陶瓷餐具嗎？,可以，陶瓷餐具完全適合洗碗機清洗，建議使用標準洗滌程式即可。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/ceramic.png
+faq_026,如何處理洗碗機無法啟動的問題？,檢查電源連接、門是否關緊、水龍頭是否開啟、過濾網是否堵塞，如無法解決應聯繫維修。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/startup.png
+faq_027,洗碗機的洗滌溫度是多少？,根據選擇的程式不同，洗滌溫度從 30°C 到 70°C 不等，高溫程式可有效殺菌。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/temperature.png
+faq_028,如何選擇適合的洗碗機鹽？,選擇專為洗碗機設計的軟化鹽，定期檢查鹽倉是否需要補充，以保護機器並提高洗滌效果。,EBF7531SBA_ZH_Manual.pdf,12,保養維護,images/salt.png
+faq_029,洗碗機可以洗塑膠容器嗎？,部分塑膠容器可以，但需確認容器標示是否適合洗碗機清洗，避免高溫變形或釋放有害物質。,EBF7531SBA_ZH_Manual.pdf,8,使用說明,images/plastic.png
+faq_030,如何處理洗碗機洗不乾淨的問題？,檢查清潔劑是否足夠、水質硬度設定是否正確、過濾網是否堵塞、噴臂是否正常運轉。,EBF7531SBA_ZH_Manual.pdf,14,故障排除,images/cleaning_issue.png
+faq_031,洗碗機的烘乾方式有哪些？,包括餘熱烘乾、強制烘乾、自動開門烘乾等，不同機型支援的烘乾方式可能不同。,EBF7531SBA_ZH_Manual.pdf,10,程式說明,images/dry_methods.png
+faq_032,如何延長洗碗機過濾網的使用壽命？,每次使用後清理過濾網，避免食物殘渣堆積，定期用軟刷清洗，如有損壞應及時更換。,EBF7531SBA_ZH_Manual.pdf,13,保養建議,images/filter.png

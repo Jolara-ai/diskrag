@@ -1,277 +1,315 @@
-# DiskRAG - 5分鐘快速開始
+# DiskRAG
 
-DiskRAG 是一個基於 DiskANN 的高性能向量搜索系統，讓您能夠快速建立自己的知識庫並進行智能搜索。
+基於 DiskANN 的向量搜尋系統，用於建立知識庫並進行搜尋。
 
-## 🚀 5分鐘快速開始
+> ⚠️ **重要**: 如果系統上沒有 Python 3.11，請使用 uv 安裝：
+> 
+> ```bash
+> # 安裝 uv
+> curl -LsSf https://astral.sh/uv/install.sh | sh
+> 
+> # 使用 uv 安裝 Python 3.11 並建立虛擬環境（一步完成）
+> uv venv --python 3.11
+> ```
 
-### 1. 安裝 (1分鐘)
+## 快速開始
 
-**Linux/macOS:**
+### 方式一：使用 Makefile（推薦）
+
 ```bash
-# 設置腳本執行權限
-chmod +x scripts/*.sh
+# 1. 先安裝環境
+make install
 
-# 執行安裝腳本
+# 2. 快速體驗（處理資料、建立索引、搜尋測試）
+# 注意：Makefile 會自動載入虛擬環境，無需手動載入
+make demo
+
+# 或手動執行其他操作（Makefile 會自動載入環境）
+make process-faq ARGS='my_faq data/faq.csv'  # 處理 FAQ
+make search-faq ARGS='my_faq "你的問題"'      # 搜尋
+make run-api                    # 啟動 API 服務
+```
+
+> 💡 **提示**：如果直接使用腳本或命令（不使用 Makefile），需要先載入虛擬環境：
+> ```bash
+> source venv/bin/activate
+> ```
+
+### 方式二：使用腳本
+
+```bash
+# 1. 先安裝環境
+./scripts/install.sh
+
+# 2. 載入虛擬環境（重要！）
+source venv/bin/activate
+
+# 3. 快速體驗
+./scripts/demo.sh
+
+# 或手動執行其他操作（需先載入環境）
+./scripts/process_faq.sh my_faq data/faq.csv
+./scripts/search_faq.sh my_faq "你的問題"
+```
+
+### 方式三：使用命令
+
+```bash
+# 先載入虛擬環境（重要！）
+source venv/bin/activate
+
+# 執行命令
+diskrag process data/file.csv --collection my_collection
+diskrag index my_collection
+diskrag search my_collection "你的問題"
+```
+
+## 安裝
+
+### 系統需求
+
+- Python 3.11（推薦，與所有依賴套件兼容性最佳）
+- pip
+- OpenAI API 金鑰
+
+### 安裝 Python 3.11
+
+如果系統上沒有 Python 3.11，請使用 `uv` 安裝：
+
+`uv` 是一個極快的 Python 包管理工具，可以同時管理 Python 版本、虛擬環境和依賴。
+
+```bash
+# 1. 安裝 uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. 重新載入 shell（或重新開啟終端）
+source ~/.zshrc  # 或 source ~/.bash_profile
+
+# 3. 使用 uv 安裝 Python 3.11 並建立虛擬環境（一步完成）
+uv venv --python 3.11
+```
+
+**優點**：
+- ⚡ 速度極快（比 pip 快 10-100 倍）
+- 🎯 一步完成 Python 安裝和虛擬環境建立
+- 📦 自動管理依賴
+- 🔧 也可以直接用 `uv pip install` 替代 `pip install`
+
+### 使用 Makefile
+
+```bash
+make install
+```
+
+### 使用腳本
+
+```bash
+chmod +x scripts/*.sh
 ./scripts/install.sh
 ```
 
-**Windows (PowerShell):**
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\scripts\install.ps1
-```
+> 💡 **Python 版本建議**: 強烈建議使用 Python 3.11，可避免所有依賴套件的兼容性問題
 
-**Windows (Command Prompt):**
-```cmd
-scripts\install.bat
-```
+## 設定
 
-### 2. 配置 (1分鐘)
-
+1. 複製環境變數範例：
 ```bash
-# 複製環境變數範例
 cp env.example .env
-
-# 編輯 .env 文件，填入您的 OpenAI API 金鑰
-# OPENAI_API_KEY=your-api-key-here
 ```
 
-### 3. 使用 (3分鐘)
-
-#### 基本使用
-```bash
-# 數據導入
-diskrag process data/example.csv --collection my_faq
-
-# 建立索引
-diskrag index my_faq
-
-# 立即查詢
-diskrag search my_faq "DiskANN 的原理是什麼？"
+2. 編輯 `.env` 檔案，填入 OpenAI API 金鑰：
+```
+OPENAI_API_KEY=your-api-key-here
 ```
 
-#### FAQ 工作流程 (推薦)
-```bash
-# 1. 準備FAQ CSV文件 (見下方格式)
-# 2. 處理FAQ文件 (自動生成相似問題)
-./scripts/process_faq.sh my_manual data/example.csv
+取得 API 金鑰：造訪 [OpenAI Platform](https://platform.openai.com/api-keys)
 
-# 3. 建立索引
-diskrag index my_manual
+## 資料格式
 
-# 4. FAQ搜索 (自動去重和格式化)
-./scripts/search_faq.sh my_manual "EBF7531SBA 這台機器怎麼用？"
-```
-
-🎉 **完成！** 您已經成功建立了一個智能搜索系統。
-
-## 📚 支援的數據格式
-
-### FAQ CSV 格式 (推薦)
+### FAQ CSV 格式（最簡單）
 
 ```csv
-id,question,answer,source_file,source_page,source_section,source_image
-faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
-faq_002,如何購買原裝配件？,應訪問 https://www.bosch-home.com/accessories/ 或聯繫當地授權經銷商。,EBF7531SBA_ZH_Manual.pdf,2,配件資訊,
-faq_003,8歲以下的青少年可以使用嗎？,不可以，未滿 8 歲的青少年不得使用本機。,EBF7531SBA_ZH_Manual.pdf,3,安全資訊,images/safety.png
+question,answer
+什麼是 DiskANN？,DiskANN 是一個可擴展的近似最近鄰搜尋演算法...
+DiskANN 解決了什麼問題？,DiskANN 解決了大規模向量搜尋中的記憶體限制問題...
 ```
 
-**FAQ 工作流程優勢：**
-- ✅ **自動問題生成**：基於原始問題生成多個相似問法
-- ✅ **結果去重**：自動去除重複答案
-- ✅ **完整出處**：保留所有來源信息
-- ✅ **高召回率**：通過多種問法提高搜索準確性
+### FAQ CSV 格式（完整，含出處）
+
+```csv
+id,question,answer,source_file,source_page,source_section
+faq_001,這份使用手冊適用於哪個型號？,適用於 EBF7531SBA 型號...,manual.pdf,1,封面
+```
 
 ### 其他格式
-- **CSV 文件**：FAQ 格式 (question, answer) 或文章格式 (title, paragraph_text)
-- **Markdown 文件**：.md, .markdown
-- **Word 文件**：.docx, .doc
 
-## 🔧 常用命令
+- Markdown: `.md`, `.markdown`
 
-### 基本操作
+## 常用命令
+
+### Makefile 命令
+
 ```bash
-# 處理單個文件
-diskrag process data/my_file.csv --collection my_collection
+make help              # 顯示所有可用命令
+make demo              # 快速體驗
+make install           # 安裝
+make process-faq ARGS='collection_name csv_file'  # 處理 FAQ
+make search-faq ARGS='collection_name query'     # 搜尋
+make run-api           # 啟動 API 服務
+make test              # 執行測試
+make clean             # 清理編譯產物
+```
 
-# 處理整個目錄
-diskrag process-dir data --prefix docs
+### diskrag 命令
+
+> ⚠️ **重要**：執行以下命令前，請先載入虛擬環境：
+> ```bash
+> source venv/bin/activate
+> ```
+
+```bash
+# 處理檔案
+diskrag process data/file.csv --collection my_collection
 
 # 建立索引
 diskrag index my_collection
 
-# 搜索
-diskrag search my_collection "您的問題"
-
-# FAQ搜索 (自動去重和格式化)
-diskrag search my_collection "您的問題" --faq
+# 搜尋
+diskrag search my_collection "你的問題"
 
 # 列出所有 collections
 diskrag list
 
-# 刪除 collection
-diskrag delete my_collection
+# 查看幫助
+diskrag --help
 ```
 
-### 高級操作
+## API 服務
+
+> ⚠️ **重要**：啟動服務前，請先載入虛擬環境：
+> ```bash
+> source venv/bin/activate
+> ```
+
+啟動服務：
+
 ```bash
-# 合併多個 collections
+# 方式一：使用 Makefile（會自動載入環境）
+make run-api
+
+# 方式二：手動啟動（需先載入環境）
+source venv/bin/activate
+python app.py
+```
+
+服務將在 `http://localhost:8000` 啟動
+
+### API 端點
+
+- `POST /faq-search` - FAQ 搜尋
+- `POST /search` - 一般搜尋
+- `GET /health` - 健康檢查
+- `GET /collections` - 列出所有 collections
+
+### 使用範例
+
+```bash
+curl -X POST 'http://localhost:8000/faq-search' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "collection": "my_collection",
+    "query": "你的問題",
+    "top_k": 5
+  }'
+```
+
+## 故障排除
+
+### 環境變數未設定
+
+```bash
+export OPENAI_API_KEY='your-api-key'
+```
+
+### 虛擬環境未啟用
+
+```bash
+source venv/bin/activate
+```
+
+### CSV 檔案格式錯誤
+
+- 確保 CSV 檔案包含 `question` 和 `answer` 欄位
+- 檢查檔案編碼為 UTF-8
+
+### 索引建立失敗
+
+```bash
+# 檢查 collection 是否存在
+diskrag list
+
+# 強制重建索引
+diskrag index my_collection --force-rebuild
+```
+
+## 進階功能
+
+### 合併 Collections
+
+```bash
 diskrag merge collection1 collection2 --target merged_collection
+```
 
-# 修復損壞的索引
+### 修復索引
+
+```bash
 diskrag doctor my_collection
+```
 
-# 高品質索引建立
+### 處理整個目錄
+
+```bash
+diskrag process-dir data --prefix docs --recursive
+```
+
+### 高品質索引
+
+```bash
 diskrag index my_collection --target-quality high
 ```
 
-## 🎯 FAQ 工作流程詳解
+## 配置
 
-### Phase 1: 數據準備
+主要配置項在 `config.yaml`：
 
-工程師只需要填寫一個簡單的 CSV 文件：
+- **索引品質**: `fast`, `balanced` (預設), `high`
+- **Embedding 模型**: `text-embedding-3-small` (預設), `text-embedding-3-large`
+- **分塊大小**: 預設 300 字元
 
-```csv
-id,question,answer,source_file,source_page,source_section,source_image
-faq_001,這份使用手冊適用於哪個型號的洗碗機？,適用於 EBF7531SBA 型號的全嵌式洗碗機。,EBF7531SBA_ZH_Manual.pdf,1,封面,images/cover.png
-```
-欄位說明：
-
-id (可選但建議): 每個問答對的唯一標識符。如果留空，系統可以自動生成。
-question (必需): 標準、最典型的問題。
-answer (必需): 對應的答案。
-source_file (可選): 來源檔案名稱，如 EBF7531SBA_ZH_Manual.pdf。
-source_page (可選): 來源頁碼。
-source_section (可選): 來源章節標題，如「安全資訊」。
-source_image (可選): 相關圖片的路徑或 URL。
+詳細配置說明請參考 [configs/README.md](configs/README.md)
 
 
-### Phase 2: 處理與索引
 
-```bash
-# 處理FAQ文件 (自動生成相似問題)
-diskrag process faq_data.csv --collection my_manual --questions
+## 更多資源
 
-# 建立索引
-diskrag index my_manual
-```
-
-**內部處理流程：**
-1. 讀取 CSV 文件
-2. 為每個原始問題生成多個相似問題
-3. 建立向量和元數據
-4. 所有問題共享同一份答案和出處信息
-
-### Phase 3: 查詢與呈現
-
-```bash
-# FAQ搜索 (自動去重和格式化)
-diskrag search my_manual "EBF7531SBA 這台機器怎麼用？" --faq
-```
-
-**查詢流程：**
-1. 向量化用戶查詢
-2. 在索引中找到最相似的問題
-3. 根據 `qa_id` 自動去重
-4. 返回格式化的結果
-
-### API 回應範例
-
-```json
-{
-  "results": [
-    {
-      "answer": "適用於 EBF7531SBA 型號的全嵌式洗碗機。",
-      "matched_question": "EBF7531SBA 的使用指南",
-      "original_question": "這份使用手冊適用於哪個型號的洗碗機？",
-      "similarity": 0.95,
-      "source": {
-        "file": "EBF7531SBA_ZH_Manual.pdf",
-        "page": 1,
-        "section": "封面",
-        "image": "images/cover.png"
-      }
-    }
-  ],
-  "timing": {
-    "embedding_time": 0.123,
-    "search_time": 0.456,
-    "total_time": 0.579
-  },
-  "stats": {
-    "search_type": "faq_pq_accelerated",
-    "total_results_before_dedup": 15,
-    "total_results_after_dedup": 5,
-    "duplicates_removed": 10
-  }
-}
-```
-
-## ⚙️ 配置選項
-
-### 品質等級
-- `fast`: 快速建立，適合大規模數據
-- `balanced`: 平衡精度和速度 (預設)
-- `high`: 高精度，適合對準確度要求高的場景
-
-### 環境變數
-- `OPENAI_API_KEY`: OpenAI API 金鑰 (必需)
-- `VERTEX_PROJECT_ID`: Google Vertex AI 專案 ID (可選)
-
-## 📖 範例
-
-### FAQ 數據處理
-```bash
-# 1. 準備 FAQ CSV 文件
-echo "question,answer" > faq.csv
-echo "什麼是 DiskANN？,DiskANN 是一個可擴展的近似最近鄰搜索算法..." >> faq.csv
-
-# 2. 處理並建立索引
-diskrag process faq.csv --collection faq_db --questions
-diskrag index faq_db
-
-# 3. 搜索
-diskrag search faq_db "DiskANN 是什麼？"
-```
-
-### 文檔處理
-```bash
-# 1. 處理 Markdown 文件
-diskrag process data/example.md --collection manual
-
-# 2. 建立索引
-diskrag index manual
-
-# 3. 搜索
-diskrag search manual "如何配置系統？"
-```
-
-## 🆘 常見問題
-
-**Q: 如何獲取 OpenAI API 金鑰？**
-A: 訪問 [OpenAI Platform](https://platform.openai.com/api-keys) 創建 API 金鑰
-
-**Q: 支援哪些文件格式？**
-A: CSV (FAQ/文章格式)、Markdown (.md)、Word (.docx)
-
-**Q: 如何提高搜索準確度？**
-A: 使用 `--target-quality high` 建立高品質索引
-
-**Q: 可以處理多大規模的數據？**
-A: DiskRAG 基於 DiskANN，可以處理百萬級別的向量數據
-
-## 🔗 更多資源
-
+- [FAQ 工作流程](docs/FAQ_WORKFLOW.md) - FAQ 處理完整流程
 - [配置說明](configs/README.md) - 詳細的配置選項
-- [工具腳本](scripts/tools/README.md) - 開發和調試工具
-- [API 服務](app.py) - 啟動 Web API 服務
+- [腳本使用說明](scripts/USAGE.md) - 所有腳本的使用方法
 
----
+## 常見問題
 
-**DiskRAG** - 讓知識搜索變得簡單高效 🚀
+**Q: 如何取得 OpenAI API 金鑰？**  
+A: 造訪 [OpenAI Platform](https://platform.openai.com/api-keys) 建立 API 金鑰
 
-歡迎提交Issue和Pull Request！
+**Q: 支援哪些檔案格式？**  
+A: CSV (FAQ/文章格式)、Markdown (.md, .markdown)
 
-## �� 許可證
+**Q: 如何提高搜尋準確度？**  
+A: 使用 `diskrag index my_collection --target-quality high` 建立高品質索引
+
+**Q: 可以處理多大規模的資料？**  
+A: 基於 DiskANN，可以處理百萬級別的向量資料
+
+## 許可證
 
 MIT License
