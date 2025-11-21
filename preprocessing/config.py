@@ -31,7 +31,7 @@ class QuestionGenerationConfig:
 
 @dataclass
 class ChunkConfig:
-    """文本分塊配置"""
+    """文字分塊配置"""
     size: int = 300  # 分塊大小
     overlap: int = 50  # 重疊大小
     min_size: int = 50  # 最小分塊大小
@@ -92,7 +92,7 @@ def validate_vector_dimension(dimension: int) -> bool:
     return dimension in SUPPORTED_DIMENSIONS
 
 def get_text_hash(text: str) -> str:
-    """生成文本的哈希值"""
+    """生成文字的哈希值"""
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 @dataclass
@@ -119,10 +119,10 @@ class CollectionInfo:
             )
 
     def add_text(self, text: str, vector_index: int) -> bool:
-        """添加文本及其向量索引
+        """添加文字及其向量索引
         
         Returns:
-            bool: 如果文本是新的（未重複），返回 True
+            bool: 如果文字是新的（未重複），返回 True
         """
         text_hash = get_text_hash(text)
         if text_hash in self.text_hashes:
@@ -133,7 +133,7 @@ class CollectionInfo:
         return True
 
     def get_vector_index(self, text: str) -> Optional[int]:
-        """獲取文本對應的向量索引"""
+        """獲取文字對應的向量索引"""
         text_hash = get_text_hash(text)
         return self.vector_offsets.get(text_hash)
 
@@ -152,7 +152,7 @@ class CollectionInfo:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'CollectionInfo':
         """從字典創建 CollectionInfo 實例"""
-        # 轉換文本哈希集合
+        # 轉換文字哈希集合
         data['text_hashes'] = set(data.get('text_hashes', []))
         
         # 轉換向量偏移映射
@@ -179,7 +179,7 @@ class CollectionInfo:
         }
 
 def load_config(config_path: str) -> PreprocessingConfig:
-    """從 YAML 文件加載配置"""
+    """從 YAML 檔案加載配置"""
     with open(config_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
     
@@ -193,7 +193,7 @@ def load_config(config_path: str) -> PreprocessingConfig:
     )
 
 def save_config(config: PreprocessingConfig, config_path: str) -> None:
-    """保存配置到 YAML 文件"""
+    """保存配置到 YAML 檔案"""
     data = {
         'collection': config.collection,
         'embedding': {

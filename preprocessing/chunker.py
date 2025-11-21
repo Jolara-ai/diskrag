@@ -343,13 +343,13 @@ class DocumentProcessor:
         try:
             manual_path = Path(self.manual_dir)
             if not manual_path.exists():
-                logger.error(f"目錄不存在: {self.manual_dir}")
+                logger.error(f"資料夾不存在: {self.manual_dir}")
                 return
             
             all_files = list(manual_path.glob("*.md"))
             
             if not all_files:
-                logger.warning(f"在 {self.manual_dir} 中沒有找到需要處理的 Markdown 文檔")
+                logger.warning(f"在 {self.manual_dir} 中沒有找到需要處理的 Markdown 檔案")
                 return
             
             all_files.sort()
@@ -382,10 +382,10 @@ class DocumentProcessor:
                 })
                 self.collection_manager.save_collection_info(self.collection_name, info)
             
-            logger.info(f"成功處理 {total_chunks} 個文本塊，來自 {len(processed_files)} 個文件")
+            logger.info(f"成功處理 {total_chunks} 個文本塊，來自 {len(processed_files)} 個檔案")
             
         except Exception as e:
-            logger.error(f"處理文檔時出錯: {str(e)}")
+            logger.error(f"處理檔案時出錯: {str(e)}")
             raise
 
 def split_markdown(content: str, chunk_size: int = 300, overlap: int = 50) -> List[Dict[str, str]]:

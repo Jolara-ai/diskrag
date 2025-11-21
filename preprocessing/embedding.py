@@ -13,7 +13,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    # 如果沒有安裝 python-dotenv，嘗試手動載入 .env 文件
+    # 如果沒有安裝 python-dotenv，嘗試手動載入 .env 檔案
     from pathlib import Path
     env_file = Path('.env')
     if env_file.exists():
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EmbeddingResult:
-    """Result of embedding generation"""
+    """Embedding 生成結果"""
     vector: np.ndarray
     text: str
     metadata: Optional[dict] = None
@@ -55,14 +55,14 @@ class EmbeddingGenerator:
         logger.info(f"Embedding 暫存目錄: {self.cache_subdir}")
 
     def _setup_clients(self):
-        """Setup embedding clients based on configuration"""
+        """建立 embedding 客戶端基於配置"""
         if self.config.provider == "openai":
             # 檢查 OpenAI API Key
             api_key = os.getenv('OPENAI_API_KEY')
             if not api_key:
                 raise ValueError(
                     "OPENAI_API_KEY 環境變數未設置。請：\n"
-                    "1. 在 .env 文件中設置 OPENAI_API_KEY=your-api-key\n"
+                    "1. 在 .env 檔案中設置 OPENAI_API_KEY=your-api-key\n"
                     "2. 或設置環境變數：export OPENAI_API_KEY=your-api-key"
                 )
             self.openai_client = OpenAI(api_key=api_key)
