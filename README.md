@@ -288,7 +288,7 @@ diskrag index my_collection --target-quality high
 A: 造訪 [OpenAI Platform](https://platform.openai.com/api-keys) 建立 API 金鑰
 
 **Q: 支援哪些檔案格式？**  
-A: CSV (FAQ/文章格式)、Markdown (.md, .markdown)
+A: CSV (FAQ)、Markdown (.md, .markdown)
 
 ## 許可證
 
